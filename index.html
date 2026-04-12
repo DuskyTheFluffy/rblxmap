@@ -1,0 +1,1812 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>RBLX // NETWORK INTEL</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Rajdhani:wght@300;400;600;700&display=swap');
+
+*, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+:root {
+  --bg:        #060a0e;
+  --bg2:       #0b1219;
+  --bg3:       #0f1c28;
+  --panel:     #091622;
+  --border:    #142233;
+  --border2:   #1e3a50;
+  --cyan:      #00e8ff;
+  --cyan2:     #00bcd4;
+  --green:     #3dff5c;
+  --green2:    #1fff47;
+  --orange:    #ff8c42;
+  --red:       #ff3f5e;
+  --purple:    #b14eff;
+  --yellow:    #ffe261;
+  --text:      #a8c8d8;
+  --text2:     #4a7080;
+  --text3:     #2a4050;
+  --glow-c:    0 0 12px rgba(0,232,255,.45), 0 0 30px rgba(0,232,255,.18);
+  --glow-g:    0 0 12px rgba(61,255,92,.45), 0 0 30px rgba(61,255,92,.18);
+  --glow-r:    0 0 12px rgba(255,63,94,.45), 0 0 30px rgba(255,63,94,.18);
+}
+
+html, body { width: 100%; height: 100%; overflow: hidden; background: var(--bg); }
+
+body {
+  font-family: 'Share Tech Mono', monospace;
+  color: var(--text);
+  cursor: crosshair;
+}
+
+/* ── MATRIX CANVAS ─────────────────────────────── */
+#matrix {
+  position: fixed; inset: 0;
+  opacity: .028;
+  pointer-events: none;
+  z-index: 0;
+}
+
+/* ── SCANLINES ─────────────────────────────────── */
+body::after {
+  content: '';
+  position: fixed; inset: 0;
+  background: repeating-linear-gradient(
+    0deg,
+    rgba(0,0,0,.06) 0px,
+    rgba(0,0,0,.06) 1px,
+    transparent 1px,
+    transparent 2px
+  );
+  pointer-events: none;
+  z-index: 9999;
+}
+
+/* ── HEADER ────────────────────────────────────── */
+#header {
+  position: fixed; top: 0; left: 0; right: 0;
+  height: 56px;
+  background: rgba(6,10,14,.95);
+  border-bottom: 1px solid var(--border);
+  display: flex; align-items: center;
+  padding: 0 18px; gap: 16px;
+  z-index: 500;
+  backdrop-filter: blur(12px);
+}
+
+.logo {
+  font-family: 'Rajdhani', sans-serif;
+  font-size: 1.25rem; font-weight: 700;
+  color: var(--cyan);
+  letter-spacing: 4px;
+  text-shadow: var(--glow-c);
+  white-space: nowrap;
+  display: flex; align-items: center; gap: 2px;
+}
+.logo em { color: var(--green); font-style: normal; }
+
+.search-wrap {
+  display: flex; align-items: center; gap: 0;
+  flex: 1; max-width: 480px;
+  border: 1px solid var(--border2);
+  transition: border-color .3s, box-shadow .3s;
+}
+.search-wrap:focus-within {
+  border-color: var(--cyan);
+  box-shadow: var(--glow-c);
+}
+
+#search-input {
+  flex: 1; background: var(--bg2);
+  border: none; outline: none;
+  color: var(--cyan);
+  font-family: 'Share Tech Mono', monospace;
+  font-size: .88rem;
+  padding: 9px 14px;
+  letter-spacing: 1px;
+}
+#search-input::placeholder { color: var(--text3); }
+
+#search-btn {
+  background: transparent; border: none; border-left: 1px solid var(--border2);
+  color: var(--cyan); font-family: 'Share Tech Mono', monospace;
+  font-size: .78rem; padding: 9px 14px;
+  cursor: pointer; letter-spacing: 2px;
+  transition: background .2s, color .2s;
+  white-space: nowrap;
+}
+#search-btn:hover { background: var(--cyan); color: var(--bg); }
+
+.hbar-stats {
+  margin-left: auto; display: flex; gap: 18px;
+  font-size: .72rem; color: var(--text2);
+}
+.hstat { display: flex; align-items: center; gap: 6px; }
+.hstat-v { color: var(--cyan); }
+
+.hbar-btns { display: flex; gap: 8px; }
+
+.hbtn {
+  background: transparent; border: 1px solid var(--border2);
+  color: var(--text2); font-family: 'Share Tech Mono', monospace;
+  font-size: .7rem; padding: 5px 10px; cursor: pointer;
+  letter-spacing: 1px; transition: all .2s;
+}
+.hbtn:hover { border-color: var(--cyan); color: var(--cyan); }
+
+/* ── NETWORK CANVAS ────────────────────────────── */
+#net-wrap {
+  position: fixed; top: 56px; left: 0;
+  right: 0; bottom: 38px;
+  z-index: 1;
+}
+#net-svg { width: 100%; height: 100%; display: block; }
+
+/* ── LEGEND ────────────────────────────────────── */
+#legend {
+  position: fixed; top: 70px; left: 14px;
+  background: rgba(9,22,34,.9);
+  border: 1px solid var(--border);
+  padding: 10px 14px;
+  font-size: .7rem; z-index: 200;
+  line-height: 1.9;
+}
+.legend-row { display: flex; align-items: center; gap: 8px; }
+.ldot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+
+/* ── INFO PANEL ────────────────────────────────── */
+#panel {
+  position: fixed; top: 56px; right: -430px;
+  width: 420px; bottom: 38px;
+  background: rgba(9,22,34,.98);
+  border-left: 1px solid var(--border);
+  z-index: 400;
+  transition: right .38s cubic-bezier(.4,0,.2,1);
+  display: flex; flex-direction: column;
+}
+#panel.open { right: 0; }
+
+#panel-scroll {
+  flex: 1; overflow-y: auto; overflow-x: hidden;
+}
+#panel-scroll::-webkit-scrollbar { width: 3px; }
+#panel-scroll::-webkit-scrollbar-thumb { background: var(--border2); }
+
+.p-header {
+  position: sticky; top: 0;
+  background: rgba(9,22,34,.98);
+  border-bottom: 1px solid var(--border);
+  padding: 14px 16px;
+  display: flex; align-items: flex-start; gap: 12px;
+  z-index: 10;
+}
+
+.p-avatar {
+  width: 72px; height: 72px; border-radius: 50%;
+  object-fit: cover; flex-shrink: 0;
+  border: 2px solid var(--cyan);
+  box-shadow: var(--glow-c);
+  background: var(--bg2);
+}
+
+.p-info { flex: 1; min-width: 0; }
+.p-username { font-family: 'Rajdhani', sans-serif; font-size: 1.1rem; font-weight: 700; color: var(--cyan); }
+.p-display  { font-size: .75rem; color: var(--text2); margin-top: 1px; }
+.p-id       { font-size: .7rem; color: var(--text3); }
+
+.status-chip {
+  display: inline-flex; align-items: center; gap: 5px;
+  padding: 2px 8px; font-size: .7rem;
+  border: 1px solid; margin-top: 4px;
+}
+.chip-online   { color: var(--green);  border-color: var(--green);  background: rgba(61,255,92,.08); }
+.chip-ingame   { color: var(--cyan);   border-color: var(--cyan);   background: rgba(0,232,255,.08); }
+.chip-offline  { color: var(--text2);  border-color: var(--text3);  background: transparent; }
+.chip-studio   { color: var(--purple); border-color: var(--purple); background: rgba(177,78,255,.08); }
+.chip-banned   { color: var(--red);    border-color: var(--red);    background: rgba(255,63,94,.08); }
+
+.p-close {
+  background: none; border: 1px solid var(--text3);
+  color: var(--text2); width: 26px; height: 26px;
+  cursor: pointer; font-size: .9rem;
+  display: flex; align-items: center; justify-content: center;
+  transition: all .2s; flex-shrink: 0;
+}
+.p-close:hover { border-color: var(--red); color: var(--red); }
+
+.p-actions {
+  padding: 10px 14px; display: flex; gap: 8px; flex-wrap: wrap;
+  border-bottom: 1px solid var(--border);
+}
+
+.p-btn {
+  background: transparent; border: 1px solid var(--border2);
+  color: var(--text); font-family: 'Share Tech Mono', monospace;
+  font-size: .72rem; padding: 6px 10px; cursor: pointer;
+  letter-spacing: 1px; transition: all .2s;
+}
+.p-btn:hover { border-color: var(--cyan); color: var(--cyan); }
+.p-btn.primary { border-color: var(--cyan); color: var(--cyan); }
+.p-btn.primary:hover { background: var(--cyan); color: var(--bg); }
+.p-btn:disabled { opacity: .35; cursor: not-allowed; }
+.p-btn.expanded { border-color: var(--green); color: var(--green); opacity: .6; }
+
+.p-section { padding: 12px 16px; border-bottom: 1px solid rgba(20,34,51,.8); }
+.p-section-title {
+  font-size: .65rem; letter-spacing: 3px; color: var(--text3);
+  margin-bottom: 10px; text-transform: uppercase;
+}
+
+.stat-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; }
+.stat-cell {
+  background: var(--bg2); border: 1px solid var(--border);
+  padding: 9px 6px; text-align: center;
+}
+.stat-v { display: block; font-size: 1.05rem; color: var(--cyan); font-weight: bold; }
+.stat-l { display: block; font-size: .62rem; color: var(--text3); letter-spacing: 1px; margin-top: 2px; }
+
+.info-row {
+  display: flex; justify-content: space-between;
+  font-size: .78rem; padding: 3px 0; color: var(--text2);
+  border-bottom: 1px solid rgba(20,34,51,.5);
+}
+.info-row:last-child { border-bottom: none; }
+.info-val { color: var(--text); text-align: right; max-width: 60%; word-break: break-all; }
+
+.group-row {
+  display: flex; align-items: center; gap: 10px;
+  padding: 7px 0; border-bottom: 1px solid rgba(20,34,51,.5);
+}
+.group-row:last-child { border-bottom: none; }
+.group-icon-wrap {
+  width: 32px; height: 32px; flex-shrink: 0;
+  border: 1px solid var(--border); background: var(--bg2);
+  overflow: hidden; display: flex; align-items: center; justify-content: center;
+  font-size: .75rem; color: var(--text3);
+}
+.group-icon-img { width: 100%; height: 100%; object-fit: cover; }
+.group-name-text { font-size: .8rem; color: var(--text); line-height: 1.3; }
+.group-sub { font-size: .7rem; color: var(--text2); }
+.group-count { margin-left: auto; font-size: .7rem; color: var(--text3); white-space: nowrap; }
+.shared-tag {
+  font-size: .6rem; padding: 1px 5px;
+  background: rgba(61,255,92,.1); border: 1px solid var(--green);
+  color: var(--green); margin-left: 4px;
+}
+
+.badge-row {
+  display: flex; align-items: center; gap: 8px;
+  padding: 6px 0; border-bottom: 1px solid rgba(20,34,51,.5);
+  font-size: .78rem;
+}
+.badge-row:last-child { border-bottom: none; }
+.badge-dot { width: 5px; height: 5px; border-radius: 50%; background: var(--cyan); flex-shrink: 0; }
+.badge-date { margin-left: auto; font-size: .68rem; color: var(--text3); white-space: nowrap; }
+
+.game-row {
+  padding: 7px 0; border-bottom: 1px solid rgba(20,34,51,.5);
+}
+.game-row:last-child { border-bottom: none; }
+.game-link { color: var(--cyan); text-decoration: none; font-size: .8rem; }
+.game-link:hover { text-decoration: underline; }
+.game-meta { font-size: .7rem; color: var(--text2); margin-top: 2px; }
+
+.mutual-wrap { display: flex; flex-wrap: wrap; gap: 5px; }
+.mutual-chip {
+  display: flex; align-items: center; gap: 5px;
+  padding: 3px 8px; background: var(--bg2);
+  border: 1px solid var(--border); font-size: .72rem;
+  cursor: pointer; transition: all .2s;
+}
+.mutual-chip:hover { border-color: var(--cyan); color: var(--cyan); }
+.mutual-chip img { width: 18px; height: 18px; border-radius: 50%; object-fit: cover; }
+
+.no-data { color: var(--text3); font-size: .78rem; padding: 6px 0; }
+
+.bio-box {
+  background: var(--bg2); border: 1px solid var(--border);
+  padding: 8px 10px; font-size: .76rem;
+  color: var(--text2); line-height: 1.5;
+  white-space: pre-wrap; word-break: break-word;
+  max-height: 100px; overflow-y: auto;
+  margin-top: 6px;
+}
+
+/* ── PATTERN PANEL ─────────────────────────────── */
+#pattern-panel {
+  position: fixed; bottom: 38px; left: 0;
+  width: 290px; max-height: 45vh;
+  background: rgba(9,22,34,.96);
+  border-top: 1px solid var(--border);
+  border-right: 1px solid var(--border);
+  z-index: 300;
+  transform: translateY(100%);
+  transition: transform .3s;
+  display: flex; flex-direction: column;
+}
+#pattern-panel.open { transform: translateY(0); }
+
+.pat-header {
+  padding: 8px 12px; border-bottom: 1px solid var(--border);
+  font-size: .68rem; letter-spacing: 3px; color: var(--text3);
+  display: flex; justify-content: space-between; align-items: center;
+}
+.pat-close { background: none; border: none; color: var(--text3); cursor: pointer; font-size: .8rem; }
+.pat-close:hover { color: var(--red); }
+
+#pattern-list { overflow-y: auto; flex: 1; }
+#pattern-list::-webkit-scrollbar { width: 3px; }
+#pattern-list::-webkit-scrollbar-thumb { background: var(--border2); }
+
+.pat-item {
+  padding: 9px 12px; border-bottom: 1px solid rgba(20,34,51,.5);
+  font-size: .74rem;
+}
+.pat-item-title { color: var(--green); margin-bottom: 2px; }
+.pat-item-detail { color: var(--text2); font-size: .7rem; line-height: 1.4; }
+
+/* ── STATUS BAR ────────────────────────────────── */
+#statusbar {
+  position: fixed; bottom: 0; left: 0; right: 0;
+  height: 38px; background: rgba(6,10,14,.96);
+  border-top: 1px solid var(--border);
+  display: flex; align-items: center;
+  padding: 0 14px; gap: 16px;
+  font-size: .7rem; color: var(--text2); z-index: 500;
+}
+#status-msg { color: var(--cyan); flex: 1; }
+.sb-sep { color: var(--border2); }
+
+/* ── LOADING ───────────────────────────────────── */
+#loading {
+  position: fixed; inset: 0;
+  background: rgba(6,10,14,.88);
+  display: none; flex-direction: column;
+  align-items: center; justify-content: center;
+  z-index: 800;
+}
+#loading.status-only {
+  position: fixed; bottom: 38px; left: 0; right: 0;
+  inset: auto 0 38px 0;
+  background: transparent;
+  align-items: flex-end; justify-content: center;
+  padding-bottom: 12px;
+  z-index: 100;
+  pointer-events: none;
+}
+.loader-ring {
+  width: 52px; height: 52px;
+  border: 2px solid var(--border2);
+  border-top-color: var(--cyan);
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+#loading.status-only .loader-ring { display: none; }
+@keyframes spin { to { transform: rotate(360deg); } }
+.loader-text { margin-top: 14px; color: var(--cyan); font-size: .8rem; letter-spacing: 3px; }
+#loading.status-only .loader-text { margin-top: 0; font-size: .75rem; }
+
+/* ── INTRO ─────────────────────────────────────── */
+#intro {
+  position: fixed; inset: 56px 0 38px 0;
+  display: flex; align-items: center; justify-content: center;
+  z-index: 10; pointer-events: none;
+}
+.intro-inner { text-align: center; }
+.intro-title {
+  font-family: 'Rajdhani', sans-serif;
+  font-size: 2.5rem; font-weight: 700;
+  color: var(--cyan); letter-spacing: 8px;
+  text-shadow: var(--glow-c);
+  margin-bottom: 10px;
+}
+.intro-sub { font-size: .8rem; color: var(--text2); line-height: 2; }
+.intro-hint { font-size: .7rem; color: var(--text3); margin-top: 16px; }
+
+/* ── TOOLTIP ───────────────────────────────────── */
+#tooltip {
+  position: fixed;
+  background: rgba(9,22,34,.97);
+  border: 1px solid var(--border2);
+  padding: 8px 12px; font-size: .76rem;
+  z-index: 600; pointer-events: none;
+  display: none; max-width: 220px;
+  box-shadow: 0 4px 20px rgba(0,0,0,.5);
+}
+.tt-name { color: var(--cyan); font-size: .85rem; margin-bottom: 3px; }
+.tt-row { color: var(--text2); margin: 1px 0; }
+.tt-hint { color: var(--text3); font-size: .68rem; margin-top: 5px; }
+
+/* ── CONTEXT MENU ──────────────────────────────── */
+#ctx-menu {
+  position: fixed; display: none;
+  background: rgba(9,22,34,.98);
+  border: 1px solid var(--border2);
+  z-index: 700; min-width: 170px;
+  box-shadow: 0 8px 24px rgba(0,0,0,.6);
+}
+.ctx-item {
+  padding: 9px 14px; font-size: .76rem; cursor: pointer;
+  border-bottom: 1px solid var(--border);
+  transition: background .15s, color .15s;
+}
+.ctx-item:last-child { border-bottom: none; }
+.ctx-item:hover { background: var(--bg3); color: var(--cyan); }
+.ctx-sep { height: 1px; background: var(--border); }
+
+/* ── SVG STYLES ────────────────────────────────── */
+.link-line { fill: none; stroke: rgba(0,232,255,.12); stroke-width: 1; }
+.link-shared { stroke: rgba(61,255,92,.35); stroke-width: 1.5; stroke-dasharray: 5,3; }
+.link-expanded { stroke: rgba(0,232,255,.36); stroke-width: 2.5; }
+.link-path { stroke: rgba(255,255,255,.25); stroke-width: 2.2; }
+.link-mutual { stroke: rgba(255,193,7,.9); stroke-width: 3; }
+
+text.node-lbl {
+  font-family: 'Share Tech Mono', monospace;
+  pointer-events: none;
+  dominant-baseline: middle;
+}
+</style>
+</head>
+<body>
+
+<canvas id="matrix"></canvas>
+
+<!-- HEADER -->
+<div id="header">
+  <div class="logo">RBLX<em>//</em>NET</div>
+  <div class="search-wrap">
+    <input id="search-input" type="text" placeholder="ENTER USERNAME..." autocomplete="off" spellcheck="false" />
+    <button id="search-btn">[ SCAN ]</button>
+  </div>
+  <div class="hbar-stats">
+    <div class="hstat">NODES <span class="hstat-v" id="s-nodes">0</span></div>
+    <div class="hstat">LINKS <span class="hstat-v" id="s-links">0</span></div>
+    <div class="hstat">ONLINE <span class="hstat-v" id="s-online">0</span></div>
+    <div class="hstat">GROUPS <span class="hstat-v" id="s-groups">0</span></div>
+  </div>
+  <div class="hbar-btns">
+    <button class="hbtn" id="pat-toggle">◈ PATTERNS</button>
+    <button class="hbtn" onclick="resetView()">⊙ RESET</button>
+    <button class="hbtn" onclick="clearAll()">✕ CLEAR</button>
+  </div>
+</div>
+
+<!-- NETWORK SVG -->
+<div id="net-wrap">
+  <svg id="net-svg"></svg>
+</div>
+
+<!-- LEGEND -->
+<div id="legend">
+  <div class="legend-row"><div class="ldot" style="background:var(--cyan);box-shadow:var(--glow-c)"></div> Center / Searched</div>
+  <div class="legend-row"><div class="ldot" style="background:var(--green)"></div> Online</div>
+  <div class="legend-row"><div class="ldot" style="background:var(--text2)"></div> Offline</div>
+  <div class="legend-row"><div class="ldot" style="background:var(--red)"></div> Banned</div>
+  <div class="legend-row"><div class="ldot" style="background:var(--purple)"></div> In Game</div>
+  <div style="margin-top:6px;color:var(--text3);font-size:.65rem">── Shared Group Link</div>
+</div>
+
+<!-- INTRO -->
+<div id="intro">
+  <div class="intro-inner">
+    <div class="intro-title">NETWORK INTEL</div>
+    <div class="intro-sub">Enter a Roblox username above to begin mapping<br>their social network graph</div>
+    <div class="intro-hint">LEFT CLICK node to inspect · RIGHT CLICK to expand · DRAG to reposition<br>SCROLL to zoom · Hold SHIFT to multi-select</div>
+  </div>
+</div>
+
+<!-- INFO PANEL -->
+<div id="panel">
+  <div class="p-header">
+    <img class="p-avatar" id="p-avatar" src="" alt="" />
+    <div class="p-info">
+      <div class="p-username" id="p-username"></div>
+      <div class="p-display" id="p-display"></div>
+      <div class="p-id" id="p-id"></div>
+      <div id="p-status"></div>
+    </div>
+    <button class="p-close" onclick="closePanel()">✕</button>
+  </div>
+  <div class="p-actions" id="p-actions"></div>
+  <div id="panel-scroll"><div id="p-body"></div></div>
+</div>
+
+<!-- PATTERN PANEL -->
+<div id="pattern-panel">
+  <div class="pat-header">
+    <span>◈ PATTERN ANALYSIS</span>
+    <button class="pat-close" onclick="togglePatterns()">✕</button>
+  </div>
+  <div id="pattern-list"><div class="pat-item" style="color:var(--text3)">No patterns yet. Expand nodes to reveal connections.</div></div>
+</div>
+
+<!-- CONTEXT MENU -->
+<div id="ctx-menu">
+  <div class="ctx-item" onclick="ctxAction('inspect')">🔍 Inspect Player</div>
+  <div class="ctx-item" onclick="ctxAction('expand')">🕸 Expand Friends Network</div>
+  <div class="ctx-item" onclick="ctxAction('center')">⊙ Set as Center</div>
+  <div class="ctx-sep"></div>
+  <div class="ctx-item" onclick="ctxAction('profile')">↗ Open Roblox Profile</div>
+  <div class="ctx-item" onclick="ctxAction('pin')">📌 Toggle Pin</div>
+</div>
+
+<!-- LOADING -->
+<div id="loading">
+  <div class="loader-ring"></div>
+  <div class="loader-text" id="load-text">SCANNING...</div>
+</div>
+
+<!-- TOOLTIP -->
+<div id="tooltip"></div>
+
+<!-- STATUS BAR -->
+<div id="statusbar">
+  <span id="status-msg">[ READY — ENTER A USERNAME TO BEGIN ]</span>
+  <span class="sb-sep">|</span>
+  <span id="sb-hint" style="color:var(--text3)">RBLX//NET v2.0</span>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.8.5/d3.min.js"></script>
+<script>
+'use strict';
+
+// ══════════════════════════════════════════════
+// MATRIX RAIN
+// ══════════════════════════════════════════════
+(function matrixRain() {
+  const c = document.getElementById('matrix');
+  const x = c.getContext('2d');
+  function resize() {
+    c.width = innerWidth; c.height = innerHeight;
+  }
+  resize();
+  window.addEventListener('resize', resize);
+  const chars = 'ｱｲｳｴｵｶｷｸｹｺｻｼｽｾｿﾀﾁﾂﾃﾄ0123456789ABCDEF<>{}[]\/|';
+  let cols, drops;
+  function init() { cols = Math.floor(c.width / 18); drops = Array(cols).fill(1); }
+  init();
+  window.addEventListener('resize', init);
+  setInterval(() => {
+    x.fillStyle = 'rgba(6,10,14,.055)';
+    x.fillRect(0, 0, c.width, c.height);
+    x.fillStyle = '#00e8ff';
+    x.font = '13px Share Tech Mono, monospace';
+    for (let i = 0; i < cols; i++) {
+      x.fillText(chars[Math.floor(Math.random() * chars.length)], i * 18, drops[i] * 18);
+      if (drops[i] * 18 > c.height && Math.random() > .972) drops[i] = 0;
+      drops[i]++;
+    }
+  }, 85);
+})();
+
+// ══════════════════════════════════════════════
+// STATE
+// ══════════════════════════════════════════════
+const G = {
+  nodes: [],        // { id, username, displayName, avatarUrl, isOnline, isBanned, presenceType, expanded, pinned, level, groups, data, dataLoaded, x, y, fx, fy }
+  links: [],        // { id, source, target, sharedGroups[] }
+  centerNode: null,
+  selectedNode: null,
+  ctxTarget: null,
+  mutualDetail: null,
+  sim: null,
+  svg: null,
+  g: null,
+  zoom: null,
+  defs: null,
+  nodeG: null,
+  linkG: null,
+  nodeSel: null,
+  linkSel: null,
+};
+
+// ══════════════════════════════════════════════
+// API MODULE
+// ══════════════════════════════════════════════
+const API = {
+  proxyUrl: 'http://localhost:8001/proxy?url=',
+  
+  async get(url) {
+    try {
+      const proxiedUrl = this.proxyUrl + encodeURIComponent(url);
+      showLoad(`API GET: ${this.formatEndpoint(url)}`, 'status');
+      console.log('📡 API GET:', url);
+      const r = await fetch(proxiedUrl, { 
+        mode: 'cors', 
+        credentials: 'omit',
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+        }
+      });
+      console.log('📡 GET Status:', r.status, r.statusText);
+      if (r.ok) {
+        const json = await r.json();
+        console.log('📡 GET Response:', json);
+        return json;
+      }
+      console.error('❌ GET Error:', r.status, r.statusText);
+    } catch (e) {
+      console.error('❌ GET Exception:', e.message, e);
+    }
+    return null;
+  },
+  async post(url, body) {
+    try {
+      const proxiedUrl = this.proxyUrl + encodeURIComponent(url);
+      showLoad(`API POST: ${this.formatEndpoint(url)}`, 'status');
+      console.log('📡 API POST:', url, body);
+      const r = await fetch(proxiedUrl, {
+        method: 'POST',
+        headers: { 
+          'Content-Type': 'application/json',
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+        },
+        body: JSON.stringify(body),
+        mode: 'cors', 
+        credentials: 'omit'
+      });
+      console.log('📡 POST Status:', r.status, r.statusText);
+      if (r.ok) {
+        const json = await r.json();
+        console.log('📡 POST Response:', json);
+        return json;
+      }
+      console.error('❌ POST Error:', r.status, r.statusText);
+    } catch (e) {
+      console.error('❌ POST Exception:', e.message, e);
+    }
+    return null;
+  },
+
+  formatEndpoint(url) {
+    try {
+      const parsed = new URL(url);
+      return `${parsed.host}${parsed.pathname}`;
+    } catch (e) {
+      return url;
+    }
+  },
+
+  async getUserByUsername(name) {
+    showLoad('API SEARCH: users.roblox.com/v1/usernames/users', 'blocking');
+    const d = await this.post('https://users.roblox.com/v1/usernames/users', {
+      usernames: [name], excludeBannedUsers: false
+    });
+    console.log('getUserByUsername response:', d);
+    if (!d) return null;
+    if (d.errors) {
+      console.error('API Error:', d.errors);
+      return null;
+    }
+    const result = d.data?.[0];
+    if (!result) {
+      console.warn('No user found in response for:', name);
+      return null;
+    }
+    return result;
+  },
+  async getUserInfo(uid) { showLoad('API FETCH PROFILE: users.roblox.com/v1/users/' + uid, 'status'); return this.get(`https://users.roblox.com/v1/users/${uid}`); },
+
+  async getAvatarUrl(uid) {
+    const d = await this.get(`https://thumbnails.roblox.com/v1/users/avatar-headshot?userIds=${uid}&size=150x150&format=Png&isCircular=false`);
+    return d?.data?.[0]?.imageUrl || null;
+  },
+  async getAvatarUrls(uids) {
+    if (!uids.length) return {};
+    const res = {};
+    for (let i = 0; i < uids.length; i += 100) {
+      const chunk = uids.slice(i, i + 100).join(',');
+      const d = await this.get(`https://thumbnails.roblox.com/v1/users/avatar-headshot?userIds=${chunk}&size=150x150&format=Png&isCircular=false`);
+      for (const item of (d?.data || [])) res[item.targetId] = item.imageUrl;
+    }
+    return res;
+  },
+
+  async getGroupIcons(ids) {
+    if (!ids.length) return {};
+    showLoad('API FETCH GROUP ICONS: thumbnails.roblox.com/v1/groups/icons', 'status');
+    const res = {};
+    const chunk = ids.slice(0, 100).join(',');
+    const d = await this.get(`https://thumbnails.roblox.com/v1/groups/icons?groupIds=${chunk}&size=150x150&format=Png&isCircular=false`);
+    for (const item of (d?.data || [])) res[item.targetId] = item.imageUrl;
+    return res;
+  },
+
+  async getFriends(uid) {
+    showLoad('API FETCH FRIEND LIST: friends.roblox.com/v1/users/' + uid + '/friends', 'status');
+    const d = await this.get(`https://friends.roblox.com/v1/users/${uid}/friends`);
+    return d?.data || [];
+  },
+  async getFriendCount(uid)   { const d = await this.get(`https://friends.roblox.com/v1/users/${uid}/friends/count`);   return d?.count || 0; },
+  async getFollowerCount(uid) { showLoad('API FETCH FOLLOWER COUNT: friends.roblox.com/v1/users/' + uid + '/followers/count', 'status'); const d = await this.get(`https://friends.roblox.com/v1/users/${uid}/followers/count`); return d?.count || 0; },
+  async getFollowingCount(uid){ showLoad('API FETCH FOLLOWING COUNT: friends.roblox.com/v1/users/' + uid + '/followings/count', 'status'); const d = await this.get(`https://friends.roblox.com/v1/users/${uid}/followings/count`);return d?.count || 0; },
+
+  async getFollowerCounts(uids) {
+    const result = {};
+    const batchSize = 8;
+    for (let i = 0; i < uids.length; i += batchSize) {
+      const chunk = uids.slice(i, i + batchSize);
+      const responses = await Promise.all(chunk.map(async uid => {
+        const d = await this.get(`https://friends.roblox.com/v1/users/${uid}/followers/count`);
+        return { uid, count: d?.count || 0 };
+      }));
+      for (const item of responses) result[item.uid] = item.count;
+    }
+    return result;
+  },
+
+  async getPresence(uids) {
+    if (!uids.length) return [];
+    showLoad('API FETCH PRESENCE: presence.roblox.com/v1/presence/users', 'status');
+    const d = await this.post('https://presence.roblox.com/v1/presence/users', { userIds: uids });
+    return d?.userPresences || [];
+  },
+
+  async getGroups(uid) {
+    const d = await this.get(`https://groups.roblox.com/v1/users/${uid}/groups/roles`);
+    return d?.data || [];
+  },
+  async getBadges(uid) {
+    const d = await this.get(`https://badges.roblox.com/v1/users/${uid}/badges?limit=25&sortOrder=Desc`);
+    return d?.data || [];
+  },
+  async getCreatedGames(uid) {
+    const d = await this.get(`https://games.roblox.com/v2/users/${uid}/games?limit=10&sortOrder=Desc`);
+    return d?.data || [];
+  },
+  async getCollectibles(uid) {
+    const d = await this.get(`https://inventory.roblox.com/v1/users/${uid}/assets/collectibles?limit=25`);
+    return d?.data || [];
+  },
+  async getFullAvatar(uid) {
+    return this.get(`https://avatar.roblox.com/v1/users/${uid}/avatar`);
+  },
+};
+
+// ══════════════════════════════════════════════
+// UTILS
+// ══════════════════════════════════════════════
+const fmtNum = n => (n === null || n === undefined || n === 'N/A') ? 'N/A' : Number(n).toLocaleString();
+const fmtDate = s => { try { return new Date(s).toLocaleDateString('en-US', {month:'short', day:'numeric', year:'numeric'}); } catch { return s || 'N/A'; } };
+
+function setStatus(msg) { document.getElementById('status-msg').textContent = '[ ' + msg + ' ]'; }
+function showLoad(msg, mode = 'blocking')  {
+  const el = document.getElementById('loading');
+  const loadText = document.getElementById('load-text');
+  loadText.textContent = msg || 'LOADING...';
+  if (mode === 'status') {
+    el.classList.add('status-only');
+  } else {
+    el.classList.remove('status-only');
+  }
+  el.style.display = 'flex';
+}
+function hideLoad()     { document.getElementById('loading').style.display = 'none'; document.getElementById('loading').classList.remove('status-only'); }
+function showAlert(msg) { alert('⚠ ' + msg + '\n\nCheck browser console (F12) for details.'); }
+
+function updateStats() {
+  const online = G.nodes.filter(n => n.isOnline || n.presenceType > 0).length;
+  const allGroups = new Set(G.nodes.flatMap(n => (n.groups || []).map(g => g.id)));
+  document.getElementById('s-nodes').textContent  = G.nodes.length;
+  document.getElementById('s-links').textContent  = G.links.length;
+  document.getElementById('s-online').textContent = online;
+  document.getElementById('s-groups').textContent = allGroups.size;
+}
+
+function linkId(a, b) { return `${Math.min(+a, +b)}-${Math.max(+a, +b)}`; }
+function srcId(l) { return +(l.source?.id ?? l.source); }
+function tgtId(l) { return +(l.target?.id ?? l.target); }
+
+function nodeColor(n) {
+  if (n.isBanned) return '#ff3f5e';
+  if (n.id === G.centerNode?.id) return '#00e8ff';
+  if (n.expanded) return '#3dff5c';
+  const pt = n.presenceType ?? (n.isOnline ? 1 : 0);
+  if (pt === 2 || pt === 3) return '#b14eff';
+  if (pt === 1 || n.isOnline) return '#3dff5c';
+  return '#4a7080';
+}
+
+function presenceText(n) {
+  if (n.isBanned) return ['BANNED', 'chip-banned'];
+  const pt = n.presenceType ?? (n.isOnline ? 1 : 0);
+  if (pt === 2) return ['IN GAME', 'chip-ingame'];
+  if (pt === 3) return ['IN STUDIO', 'chip-studio'];
+  if (pt === 1) return ['ONLINE', 'chip-online'];
+  return ['OFFLINE', 'chip-offline'];
+}
+
+// ══════════════════════════════════════════════
+// D3 GRAPH INIT
+// ══════════════════════════════════════════════
+function initGraph() {
+  const wrap = document.getElementById('net-wrap');
+  const W = wrap.clientWidth, H = wrap.clientHeight;
+
+  G.svg = d3.select('#net-svg');
+  G.svg.selectAll('*').remove();
+
+  G.defs = G.svg.append('defs');
+
+  // Glow filter
+  const glow = G.defs.append('filter').attr('id', 'glow').attr('x', '-50%').attr('y', '-50%').attr('width', '200%').attr('height', '200%');
+  glow.append('feGaussianBlur').attr('stdDeviation', '4').attr('result', 'coloredBlur');
+  const fm = glow.append('feMerge');
+  fm.append('feMergeNode').attr('in', 'coloredBlur');
+  fm.append('feMergeNode').attr('in', 'SourceGraphic');
+
+  // Strong glow
+  const glow2 = G.defs.append('filter').attr('id', 'glow2').attr('x', '-80%').attr('y', '-80%').attr('width', '260%').attr('height', '260%');
+  glow2.append('feGaussianBlur').attr('stdDeviation', '8').attr('result', 'coloredBlur');
+  const fm2 = glow2.append('feMerge');
+  fm2.append('feMergeNode').attr('in', 'coloredBlur');
+  fm2.append('feMergeNode').attr('in', 'SourceGraphic');
+
+  // Grid background
+  const patGrid = G.defs.append('pattern').attr('id', 'grid').attr('width', 40).attr('height', 40).attr('patternUnits', 'userSpaceOnUse');
+  patGrid.append('path').attr('d', 'M 40 0 L 0 0 0 40').attr('fill', 'none').attr('stroke', 'rgba(20,34,51,.4)').attr('stroke-width', 0.5);
+  G.svg.append('rect').attr('width', '100%').attr('height', '100%').attr('fill', 'url(#grid)');
+
+  // Zoom
+  G.zoom = d3.zoom().scaleExtent([.06, 5]).on('zoom', e => G.g.attr('transform', e.transform));
+  G.svg.call(G.zoom).on('dblclick.zoom', null);
+
+  // Click background to deselect
+  G.svg.on('click', e => { if (e.target.tagName === 'svg' || e.target.tagName === 'rect') closePanel(); });
+  G.svg.on('contextmenu', e => e.preventDefault());
+
+  // Main group
+  G.g = G.svg.append('g').attr('class', 'main-g');
+  G.linkG = G.g.append('g').attr('class', 'links');
+  G.nodeG = G.g.append('g').attr('class', 'nodes');
+
+  // Simulation
+  G.sim = d3.forceSimulation()
+    .force('link', d3.forceLink().id(d => d.id).distance(d => {
+      const isCenter = srcId(d) === G.centerNode?.id || tgtId(d) === G.centerNode?.id;
+      const baseDistance = isCenter ? 220 : 180;
+      const expandedBonus = d.expandedFrom ? 40 : 0;
+      return baseDistance + expandedBonus + ((nodeR(d.source) + nodeR(d.target)) / 2);
+    }).strength(.72))
+    .force('charge', d3.forceManyBody().strength(-640).distanceMax(700))
+    .force('center', d3.forceCenter(W / 2, H / 2).strength(.04))
+    .force('collide', d3.forceCollide(d => nodeR(d) + 30).iterations(4))
+    .on('tick', onTick);
+
+  window.addEventListener('resize', () => {
+    const w2 = wrap.clientWidth, h2 = wrap.clientHeight;
+    G.sim.force('center', d3.forceCenter(w2 / 2, h2 / 2).strength(.04));
+  });
+}
+
+function nodeR(d) {
+  if (!d) return 28;
+  
+  // Base size calculation: center node is larger
+  let baseSize = 22;
+  if (d.id === G.centerNode?.id) baseSize = 42;
+  else if (d.level === 1) baseSize = 28;
+  
+  // Scale by follower count using logarithmic scale
+  // This makes the size grow slower as followers increase, preventing extreme size differences
+  const followers = d.data?.social?.followers || 0;
+  const followerBonus = Math.log10(followers + 1) * 4; // Log scale multiplier
+  
+  return baseSize + followerBonus;
+}
+
+function positionExpandedChildren(parent) {
+  if (!parent || parent.x == null || parent.y == null) return;
+  const childLinks = G.links.filter(l => l.expandedFrom === parent.id);
+  if (!childLinks.length) return;
+
+  const children = childLinks.map(l => {
+    const childId = srcId(l) === parent.id ? tgtId(l) : srcId(l);
+    return G.nodes.find(n => n.id === childId);
+  }).filter(Boolean);
+  if (!children.length) return;
+
+  const radius = 230 + nodeR(parent);
+  const offset = (parent.id % 360) * (Math.PI / 180);
+
+  children.forEach((child, index) => {
+    const angle = offset + (Math.PI * 2 * index / children.length);
+    child.x = parent.x + Math.cos(angle) * radius;
+    child.y = parent.y + Math.sin(angle) * radius;
+  });
+}
+
+function onTick() {
+  if (G.linkSel) G.linkSel
+    .attr('x1', d => d.source.x).attr('y1', d => d.source.y)
+    .attr('x2', d => d.target.x).attr('y2', d => d.target.y);
+  if (G.nodeSel) G.nodeSel.attr('transform', d => `translate(${d.x ?? 0},${d.y ?? 0})`);
+}
+
+// ══════════════════════════════════════════════
+// GRAPH UPDATE
+// ══════════════════════════════════════════════
+function updateGraph() {
+  // ── Clip paths
+  G.defs.selectAll('clipPath.nc')
+    .data(G.nodes, d => d.id)
+    .join(
+      en => { const cp = en.append('clipPath').attr('class','nc').attr('id', d => `c-${d.id}`); cp.append('circle').attr('r', d => nodeR(d)); },
+      up => up.select('circle').attr('r', d => nodeR(d)),
+      ex => ex.remove()
+    );
+
+  // ── Links
+  G.linkSel = G.linkG.selectAll('line')
+    .data(G.links, d => d.id)
+    .join(
+      en => en.append('line')
+        .attr('class', d => getLinkClasses(d)),
+      up => up.attr('class', d => getLinkClasses(d)),
+      ex => ex.remove()
+    );
+
+  // ── Nodes
+  const enter = G.nodeG.selectAll('g.node')
+    .data(G.nodes, d => d.id)
+    .join(
+      en => {
+        const ng = en.append('g').attr('class','node').style('cursor','pointer');
+
+        // Outer glow ring
+        ng.append('circle').attr('class','ring')
+          .attr('r', d => nodeR(d) + 5)
+          .attr('fill','none')
+          .attr('stroke', d => nodeColor(d))
+          .attr('stroke-width', 1)
+          .attr('opacity', .4)
+          .attr('filter','url(#glow)');
+
+        // Avatar circle background
+        ng.append('circle').attr('class','bg-circle')
+          .attr('r', d => nodeR(d))
+          .attr('fill','#0b1219');
+
+        // Avatar image
+        ng.append('image').attr('class','av-img')
+          .attr('x', d => -nodeR(d))
+          .attr('y', d => -nodeR(d))
+          .attr('width', d => nodeR(d) * 2)
+          .attr('height', d => nodeR(d) * 2)
+          .attr('clip-path', d => `url(#c-${d.id})`)
+          .attr('preserveAspectRatio','xMidYMid slice')
+          .attr('href', d => d.avatarUrl || '');
+
+        // Border ring
+        ng.append('circle').attr('class','border-ring')
+          .attr('r', d => nodeR(d))
+          .attr('fill','none')
+          .attr('stroke', d => nodeColor(d))
+          .attr('stroke-width', d => d.id === G.centerNode?.id ? 2.5 : 1.5)
+          .attr('filter', d => (d.isOnline || d.id === G.centerNode?.id) ? 'url(#glow)' : null);
+
+        // Expanded dot (top-right)
+        ng.append('circle').attr('class','exp-dot')
+          .attr('cx', d => nodeR(d) - 7).attr('cy', d => -(nodeR(d) - 7))
+          .attr('r', 5)
+          .attr('fill', d => d.expanded ? '#3dff5c' : '#142233')
+          .attr('stroke','#060a0e').attr('stroke-width',1.5);
+
+        // Online dot (top-left)
+        ng.append('circle').attr('class','on-dot')
+          .attr('cx', d => -(nodeR(d) - 7)).attr('cy', d => -(nodeR(d) - 7))
+          .attr('r', 4)
+          .attr('fill', d => {
+            if (d.isBanned) return '#ff3f5e';
+            const pt = d.presenceType ?? (d.isOnline ? 1 : 0);
+            if (pt === 2 || pt === 3) return '#b14eff';
+            return pt > 0 ? '#3dff5c' : 'transparent';
+          });
+
+        // Username label
+        ng.append('text').attr('class','node-lbl')
+          .attr('y', d => nodeR(d) + 13)
+          .attr('text-anchor','middle')
+          .attr('font-size', d => d.id === G.centerNode?.id ? '11px' : '9.5px')
+          .attr('fill', d => d.id === G.centerNode?.id ? '#00e8ff' : '#a8c8d8')
+          .text(d => d.username.length > 16 ? d.username.slice(0,15) + '…' : d.username);
+
+        // Interactions
+        ng.on('click', (ev, d) => { ev.stopPropagation(); hideCtx(); selectNode(d); })
+          .on('contextmenu', (ev, d) => { ev.preventDefault(); ev.stopPropagation(); showCtx(ev, d); })
+          .on('mouseenter', (ev, d) => showTip(ev, d))
+          .on('mousemove', moveTip)
+          .on('mouseleave', hideTip)
+          .call(d3.drag()
+            .on('start', (ev, d) => { if (!ev.active) G.sim.alphaTarget(.3).restart(); d.fx = d.x; d.fy = d.y; })
+            .on('drag',  (ev, d) => { d.fx = ev.x; d.fy = ev.y; })
+            .on('end',   (ev, d) => { if (!ev.active) G.sim.alphaTarget(0); if (!d.pinned && d.id !== G.centerNode?.id) { d.fx = null; d.fy = null; } })
+          );
+
+        return ng;
+      },
+      up => {
+        up.select('.ring').attr('stroke', d => nodeColor(d)).attr('r', d => nodeR(d) + 5);
+        up.select('.bg-circle').attr('r', d => nodeR(d));
+        up.select('.av-img')
+          .attr('x', d => -nodeR(d)).attr('y', d => -nodeR(d))
+          .attr('width', d => nodeR(d) * 2).attr('height', d => nodeR(d) * 2)
+          .attr('href', d => d.avatarUrl || '');
+        up.select('.border-ring')
+          .attr('r', d => nodeR(d))
+          .attr('stroke', d => nodeColor(d))
+          .attr('stroke-width', d => d.id === G.centerNode?.id ? 2.5 : 1.5)
+          .attr('filter', d => (d.isOnline || d.id === G.centerNode?.id) ? 'url(#glow)' : null);
+        up.select('.exp-dot')
+          .attr('cx', d => nodeR(d) - 7).attr('cy', d => -(nodeR(d) - 7))
+          .attr('fill', d => d.expanded ? '#3dff5c' : '#142233');
+        up.select('.on-dot')
+          .attr('cx', d => -(nodeR(d) - 7)).attr('cy', d => -(nodeR(d) - 7))
+          .attr('fill', d => {
+            if (d.isBanned) return '#ff3f5e';
+            const pt = d.presenceType ?? (d.isOnline ? 1 : 0);
+            if (pt === 2 || pt === 3) return '#b14eff';
+            return pt > 0 ? '#3dff5c' : 'transparent';
+          });
+        up.select('.node-lbl')
+          .attr('y', d => nodeR(d) + 13)
+          .attr('font-size', d => d.id === G.centerNode?.id ? '11px' : '9.5px')
+          .attr('fill', d => d.id === G.centerNode?.id ? '#00e8ff' : '#a8c8d8');
+        return up;
+      },
+      ex => ex.remove()
+    );
+
+  G.nodeSel = G.nodeG.selectAll('g.node');
+
+  G.sim.nodes(G.nodes);
+  G.sim.force('link').links(G.links);
+  G.sim.alpha(.35).restart();
+
+  updateStats();
+}
+
+// ══════════════════════════════════════════════
+// SEARCH
+// ══════════════════════════════════════════════
+async function searchUser() {
+  const username = document.getElementById('search-input').value.trim();
+  if (!username) { alert('Please enter a username'); return; }
+
+  console.log('🔍 Searching for user:', username);
+  document.getElementById('intro').style.display = 'none';
+  showLoad('LOOKING UP USERNAME via users.roblox.com/v1/usernames/users', 'blocking');
+
+  let basic;
+  try {
+    basic = await API.getUserByUsername(username);
+  } catch (err) {
+    hideLoad();
+    console.error('❌ searchUser exception:', err);
+    setStatus('SEARCH FAILED: ' + username);
+    showAlert('Search failed for: ' + username + '\nPlease check your connection and try again.');
+    return;
+  }
+
+  if (!basic) {
+    hideLoad();
+    console.error('❌ searchUser: getUserByUsername returned null for:', username);
+    setStatus('USER NOT FOUND: ' + username);
+    showAlert('User not found: ' + username);
+    return;
+  }
+  console.log('✓ User found:', basic);
+
+  const uid = +basic.id;
+  showLoad('FETCHING USER PROFILE & FRIENDS LIST', 'blocking');
+
+  const [info, friends, avatarUrl] = await Promise.all([
+    API.getUserInfo(uid),
+    API.getFriends(uid),
+    API.getAvatarUrl(uid),
+  ]);
+
+  showLoad('LOADING ALL FRIEND AVATARS & PRESENCE DATA', 'blocking');
+  const friendIds = friends.map(f => +f.id);
+  const [avatarMap, presences] = await Promise.all([
+    API.getAvatarUrls(friendIds),
+    API.getPresence([uid, ...friendIds.slice(0, 48)])
+  ]);
+  const presMap = {};
+  for (const p of presences) presMap[+p.userId] = p;
+
+  // ── BUILD & RENDER GRAPH WITH QUICK DATA ──
+  G.nodes = []; G.links = [];
+
+  const wrap = document.getElementById('net-wrap');
+  const W = wrap.clientWidth, H = wrap.clientHeight;
+
+  const centerNode = {
+    id: uid,
+    username: info?.name || basic.requestedUsername || username,
+    displayName: info?.displayName || '',
+    avatarUrl,
+    isOnline: (presMap[uid]?.userPresenceType || 0) > 0,
+    isBanned: info?.isBanned || false,
+    presenceType: presMap[uid]?.userPresenceType || 0,
+    expanded: true, pinned: true, level: 0,
+    groups: [],
+    data: { info, presence: presMap[uid], social: { followers: 0 } },
+    dataLoaded: false,
+    x: W / 2, y: H / 2, fx: W / 2, fy: H / 2,
+  };
+  G.nodes.push(centerNode);
+  G.centerNode = centerNode;
+
+  for (const f of friends) {
+    const fid = +f.id;
+    const ptype = presMap[fid]?.userPresenceType || 0;
+    G.nodes.push({
+      id: fid,
+      username: f.name,
+      displayName: f.displayName || '',
+      avatarUrl: avatarMap[fid] || null,
+      isOnline: f.isOnline || ptype > 0,
+      isBanned: false,
+      presenceType: ptype,
+      expanded: false, pinned: false, level: 1,
+      sourceId: uid,
+      groups: [],
+      data: { presence: presMap[fid], social: { followers: 0 } },
+      dataLoaded: false,
+    });
+    G.links.push({ id: linkId(uid, fid), source: uid, target: fid, sharedGroups: [], expandedFrom: uid });
+  }
+
+  refreshSharedLinks();
+  updateGraph();
+  hideLoad();
+  setStatus(`NETWORK: ${centerNode.username} + ${friends.length} friends`);
+  setTimeout(() => selectNode(centerNode), 600);
+
+  // ── LOAD DETAILS PROGRESSIVELY IN BACKGROUND ──
+  (async () => {
+    try {
+      showLoad('LOADING FOLLOWER COUNTS', 'status');
+      const socialIds = [uid, ...friendIds];
+      const followerMap = await API.getFollowerCounts(socialIds);
+      for (const node of G.nodes) {
+        if (followerMap[node.id]) node.data.social.followers = followerMap[node.id];
+      }
+
+      showLoad('FETCHING GROUPS & BADGES', 'status');
+      const [groups, badges] = await Promise.all([
+        API.getGroups(uid),
+        API.getBadges(uid)
+      ]);
+
+      showLoad('LOADING GROUP ICONS', 'status');
+      const gids = groups.map(g => g.group?.id).filter(Boolean);
+      const groupIcons = gids.length ? await API.getGroupIcons(gids) : {};
+
+      // Update center node groups
+      centerNode.groups = groups.map(g => ({ id: g.group?.id, name: g.group?.name, icon: groupIcons[g.group?.id] || null }));
+      centerNode.data.groups = groups;
+      centerNode.data.badges = badges;
+
+      refreshSharedLinks();
+      analyzePatterns();
+      updateGraph();
+      showLoad('SCAN COMPLETE', 'status');
+      setStatus(`FULL SCAN: ${centerNode.username} — ${friends.length} friends, ${centerNode.groups.length} groups`);
+      setTimeout(() => hideLoad(), 1500);
+    } catch (err) {
+      console.error('Error loading details:', err);
+      setStatus('Details load had issues (partial data visible)');
+      setTimeout(() => hideLoad(), 2000);
+    }
+  })();
+}
+
+// ══════════════════════════════════════════════
+// EXPAND NODE
+async function expandNode(nodeId) {
+  const node = G.nodes.find(n => n.id === +nodeId);
+  if (!node) return;
+  if (node.expanded) { setStatus(`${node.username} already expanded`); return; }
+
+  node.expanded = true;
+  showLoad(`EXPANDING ${node.username.toUpperCase()} — fetching friends and groups`, 'blocking');
+  setStatus('Expanding: ' + node.username);
+
+  const [friends, groups] = await Promise.all([
+    API.getFriends(node.id),
+    API.getGroups(node.id),
+  ]);
+
+  // Update node groups if not loaded
+  if (!node.groups.length && groups.length) {
+    const gids = groups.map(g => g.group?.id).filter(Boolean);
+    const icons = gids.length ? await API.getGroupIcons(gids) : {};
+    node.data = node.data || {};
+    node.data.groups = groups.map(g => ({ ...g, _icon: icons[g.group?.id] || null }));
+    node.groups = node.data.groups.map(g => ({ id: g.group?.id, name: g.group?.name, icon: g._icon }));
+  }
+
+  const newFriends = friends.filter(f => !G.nodes.find(n => n.id === +f.id));
+  const newIds = newFriends.map(f => +f.id);
+
+  showLoad('LOADING expanded friend avatars, follower counts, and presence', 'blocking');
+  const [avatarMap, followerMap, presences] = await Promise.all([
+    newIds.length ? API.getAvatarUrls(newIds) : Promise.resolve({}),
+    newIds.length ? API.getFollowerCounts(newIds) : Promise.resolve({}),
+    newIds.length ? API.getPresence(newIds.slice(0, 50)) : Promise.resolve([]),
+  ]);
+
+  const presMap = {};
+  for (const p of presences) presMap[+p.userId] = p;
+
+  let added = 0;
+  for (const f of friends) {
+    const fid = +f.id;
+    if (!G.nodes.find(n => n.id === fid)) {
+      const ptype = presMap[fid]?.userPresenceType || 0;
+      G.nodes.push({
+        id: fid,
+        username: f.name,
+        displayName: f.displayName || '',
+        avatarUrl: avatarMap[fid] || null,
+        isOnline: f.isOnline || ptype > 0,
+        isBanned: false,
+        presenceType: ptype,
+        expanded: false, pinned: false, level: (node.level || 1) + 1,
+        sourceId: node.id,
+        groups: [],
+        data: { presence: presMap[fid], social: { followers: followerMap[fid] || 0 } },
+        dataLoaded: false,
+      });
+      added++;
+    }
+    const lid = linkId(node.id, fid);
+    if (!G.links.find(l => l.id === lid)) {
+      G.links.push({ id: lid, source: node.id, target: fid, sharedGroups: [], expandedFrom: node.id });
+    }
+  }
+
+  refreshSharedLinks();
+  positionExpandedChildren(node);
+  updateGraph();
+  analyzePatterns();
+  hideLoad();
+  setStatus(`Expanded ${node.username}: +${added} new nodes`);
+
+  // Update panel button if visible
+  const btn = document.getElementById(`ebtn-${node.id}`);
+  if (btn) { btn.disabled = true; btn.textContent = '✓ EXPANDED'; btn.className = 'p-btn expanded'; }
+}
+
+// ══════════════════════════════════════════════
+// LOAD NODE FULL DATA
+// ══════════════════════════════════════════════
+async function loadNodeData(node) {
+  if (node.dataLoaded) return;
+  showLoad('LOADING full profile data, groups, social stats, badges, and games', 'status');
+  setStatus('Loading: ' + node.username);
+
+  const [info, groups, fc, flwc, flgc, badges, games, collectibles] = await Promise.all([
+    node.data?.info || API.getUserInfo(node.id),
+    API.getGroups(node.id),
+    API.getFriendCount(node.id),
+    API.getFollowerCount(node.id),
+    API.getFollowingCount(node.id),
+    API.getBadges(node.id),
+    API.getCreatedGames(node.id),
+    API.getCollectibles(node.id),
+  ]);
+
+  const gids = groups.map(g => g.group?.id).filter(Boolean);
+  const icons = gids.length ? await API.getGroupIcons(gids) : {};
+  const groupsData = groups.map(g => ({ ...g, _icon: icons[g.group?.id] || null }));
+
+  if (!node.avatarUrl) node.avatarUrl = await API.getAvatarUrl(node.id);
+
+  node.data = {
+    ...node.data,
+    info,
+    groups: groupsData,
+    social: { friends: fc, followers: flwc, following: flgc },
+    badges,
+    games,
+    collectibles,
+  };
+  node.groups = groupsData.map(g => ({ id: g.group?.id, name: g.group?.name, icon: g._icon }));
+  node.dataLoaded = true;
+
+  // Update avatar on graph
+  G.nodeG.selectAll('g.node').filter(d => d.id === node.id)
+    .select('.av-img').attr('href', node.avatarUrl || '');
+
+  refreshSharedLinks();
+  analyzePatterns();
+  setStatus('Loaded: ' + node.username);
+}
+
+// ══════════════════════════════════════════════
+// SELECT NODE / PANEL
+// ══════════════════════════════════════════════
+async function selectNode(node, options = { keepMutual: false }) {
+  if (!options.keepMutual) G.mutualDetail = null;
+  G.selectedNode = node;
+  const panel = document.getElementById('panel');
+
+  // Header
+  document.getElementById('p-avatar').src = node.avatarUrl || '';
+  document.getElementById('p-username').textContent = node.username;
+  document.getElementById('p-display').textContent = node.displayName && node.displayName !== node.username ? node.displayName : '';
+  document.getElementById('p-id').textContent = 'ID: ' + node.id;
+
+  const [ptext, pclass] = presenceText(node);
+  document.getElementById('p-status').innerHTML = `<span class="status-chip ${pclass}">● ${ptext}</span>`;
+
+  // Actions
+  document.getElementById('p-actions').innerHTML = `
+    <button class="p-btn primary" id="ebtn-${node.id}"
+      onclick="expandNode(${node.id})"
+      ${node.expanded ? 'disabled style="opacity:.4;cursor:not-allowed"' : ''}>
+      ${node.expanded ? '✓ EXPANDED' : '[ EXPAND NET ]'}
+    </button>
+    <button class="p-btn" onclick="window.open('https://www.roblox.com/users/${node.id}/profile','_blank')">[ PROFILE ]</button>
+    ${node.id !== G.centerNode?.id ? `<button class="p-btn" onclick="setCenterNode(${node.id})">[ SET CENTER ]</button>` : ''}
+  `;
+
+  // Show skeleton
+  document.getElementById('p-body').innerHTML = `<div style="padding:20px;color:var(--text3);text-align:center;font-size:.8rem">LOADING DATA...</div>`;
+  panel.classList.add('open');
+
+  // Load data
+  await loadNodeData(node);
+  renderPanel(node);
+}
+
+function renderPanel(node) {
+  const d = node.data || {};
+  const info = d.info || {};
+  const social = d.social || {};
+  const groups = d.groups || [];
+  const badges = d.badges || [];
+  const games = d.games || [];
+  const collectibles = d.collectibles || [];
+  const presence = d.presence || {};
+
+  // Center node groups for shared detection
+  const centerGids = new Set((G.centerNode?.groups || []).map(g => g.id));
+
+  // Mutual friends: nodes connected to BOTH this node AND the center
+  const mutuals = G.nodes.filter(n => {
+    if (n.id === node.id || n.id === G.centerNode?.id) return false;
+    const toThis = G.links.some(l => (srcId(l) === node.id && tgtId(l) === n.id) || (srcId(l) === n.id && tgtId(l) === node.id));
+    const toCenter = G.links.some(l => (srcId(l) === G.centerNode?.id && tgtId(l) === n.id) || (srcId(l) === n.id && tgtId(l) === G.centerNode?.id));
+    return toThis && toCenter;
+  });
+
+  let h = '';
+
+  // Account
+  const created = fmtDate(info.created);
+  const bio = (info.description || '').trim();
+  h += `<div class="p-section">
+    <div class="p-section-title">ACCOUNT INFO</div>
+    <div class="info-row"><span>Account Created</span><span class="info-val">${created}</span></div>
+    <div class="info-row"><span>Roblox ID</span><span class="info-val" style="color:var(--cyan)">${node.id}</span></div>
+    ${info.isBanned ? `<div class="info-row"><span>Status</span><span class="info-val" style="color:var(--red)">⛔ BANNED</span></div>` : ''}
+    ${bio ? `<div class="bio-box">${bio.substring(0,300).replace(/</g,'&lt;').replace(/>/g,'&gt;')}</div>` : ''}
+  </div>`;
+
+  // Social stats
+  h += `<div class="p-section">
+    <div class="p-section-title">SOCIAL STATS</div>
+    <div class="stat-grid">
+      <div class="stat-cell"><span class="stat-v">${fmtNum(social.friends)}</span><span class="stat-l">FRIENDS</span></div>
+      <div class="stat-cell"><span class="stat-v">${fmtNum(social.followers)}</span><span class="stat-l">FOLLOWERS</span></div>
+      <div class="stat-cell"><span class="stat-v">${fmtNum(social.following)}</span><span class="stat-l">FOLLOWING</span></div>
+    </div>
+  </div>`;
+
+  // Presence detail
+  if (presence.userPresenceType === 2) {
+    h += `<div class="p-section">
+      <div class="p-section-title">CURRENTLY PLAYING</div>
+      <div class="info-row"><span>Game</span><span class="info-val" style="color:var(--purple)">${presence.lastLocation || 'Unknown'}</span></div>
+      ${presence.rootPlaceId ? `<div class="info-row"><span>Link</span><span class="info-val"><a href="https://www.roblox.com/games/${presence.rootPlaceId}" target="_blank" style="color:var(--cyan)">Open Game →</a></span></div>` : ''}
+    </div>`;
+  }
+
+  // Groups
+  h += `<div class="p-section">
+    <div class="p-section-title">GROUPS (${groups.length})</div>`;
+  if (!groups.length) { h += `<div class="no-data">No groups or private</div>`; }
+  for (const g of groups.slice(0, 12)) {
+    const grp = g.group || {};
+    const role = g.role || {};
+    const isCenter = node.id !== G.centerNode?.id;
+    const shared = isCenter && centerGids.has(grp.id);
+    h += `<div class="group-row">
+      <div class="group-icon-wrap">
+        ${g._icon ? `<img class="group-icon-img" src="${g._icon}" alt="" />` : (grp.name||'?')[0]?.toUpperCase()}
+      </div>
+      <div style="flex:1;min-width:0">
+        <div class="group-name-text">${(grp.name||'?').substring(0,28)}${shared ? `<span class="shared-tag">SHARED</span>` : ''}</div>
+        <div class="group-sub">${role.name||'?'} · Rank ${role.rank??'?'}</div>
+      </div>
+      <div class="group-count">${fmtNum(grp.memberCount)}</div>
+    </div>`;
+  }
+  if (groups.length > 12) h += `<div class="no-data" style="margin-top:4px">+${groups.length - 12} more groups</div>`;
+  h += `</div>`;
+
+  // Mutual friends
+  if (node.id !== G.centerNode?.id && mutuals.length > 0) {
+    h += `<div class="p-section">
+      <div class="p-section-title">MUTUAL FRIENDS (${mutuals.length})</div>
+      <div class="mutual-wrap">
+        ${mutuals.map(m => `<div class="mutual-chip" onclick="selectMutual(${m.id}, ${node.id})">
+          ${m.avatarUrl ? `<img src="${m.avatarUrl}" alt="" />` : ''}
+          ${m.username}
+        </div>`).join('')}
+      </div>
+    </div>`;
+  }
+
+  if (G.mutualDetail?.targetId === node.id && G.mutualDetail?.baseId) {
+    const mutualBase = G.nodes.find(n => n.id === G.mutualDetail.baseId);
+    const mutualsBetween = mutualBase ? G.nodes.filter(n => n.id !== node.id && n.id !== mutualBase.id &&
+      G.links.some(l => (srcId(l) === node.id && tgtId(l) === n.id) || (srcId(l) === n.id && tgtId(l) === node.id)) &&
+      G.links.some(l => (srcId(l) === mutualBase.id && tgtId(l) === n.id) || (srcId(l) === n.id && tgtId(l) === mutualBase.id))) : [];
+    if (mutualBase && mutualsBetween.length) {
+      h += `<div class="p-section">
+        <div class="p-section-title">COMMON NETWORK WITH ${mutualBase.username.toUpperCase()}</div>
+        <div class="mutual-wrap">
+          ${mutualsBetween.map(m => `<div class="mutual-chip" onclick="selectNodeById(${m.id})">
+            ${m.avatarUrl ? `<img src="${m.avatarUrl}" alt="" />` : ''}
+            ${m.username}
+          </div>`).join('')}
+        </div>
+      </div>`;
+    }
+  }
+
+  // Badges
+  h += `<div class="p-section">
+    <div class="p-section-title">RECENT BADGES (${badges.length})</div>`;
+  if (!badges.length) { h += `<div class="no-data">No badges or private</div>`; }
+  for (const b of badges.slice(0, 10)) {
+    h += `<div class="badge-row">
+      <div class="badge-dot"></div>
+      <div style="flex:1;min-width:0;overflow:hidden">${(b.name||'?').substring(0,40)}</div>
+      <div class="badge-date">${fmtDate(b.awardedDate)}</div>
+    </div>`;
+  }
+  h += `</div>`;
+
+  // Created Games
+  if (games.length) {
+    h += `<div class="p-section">
+      <div class="p-section-title">CREATED GAMES (${games.length})</div>`;
+    for (const g of games) {
+      const pid = g.rootPlace?.id || g.id;
+      h += `<div class="game-row">
+        <div><a class="game-link" href="https://www.roblox.com/games/${pid}" target="_blank">${(g.name||'?').substring(0,40)}</a></div>
+        <div class="game-meta">Visits: ${fmtNum(g.visits)} · Updated: ${fmtDate(g.updated)}</div>
+      </div>`;
+    }
+    h += `</div>`;
+  }
+
+  // Collectibles
+  if (collectibles.length) {
+    h += `<div class="p-section">
+      <div class="p-section-title">COLLECTIBLES (${collectibles.length})</div>`;
+    for (const item of collectibles.slice(0, 10)) {
+      h += `<div class="badge-row">
+        <div class="badge-dot" style="background:var(--green)"></div>
+        <div style="flex:1;min-width:0">${(item.name||'?').substring(0,40)}</div>
+        <div class="badge-date">ID: ${item.assetId}</div>
+      </div>`;
+    }
+    h += `</div>`;
+  }
+
+  // Bottom spacer
+  h += `<div style="height:20px"></div>`;
+
+  document.getElementById('p-body').innerHTML = h;
+}
+
+function closePanel() {
+  document.getElementById('panel').classList.remove('open');
+  G.selectedNode = null;
+}
+
+function selectNodeById(id) {
+  const node = G.nodes.find(n => n.id === +id);
+  if (node) selectNode(node);
+}
+
+function selectMutual(mutualId, baseId) {
+  const node = G.nodes.find(n => n.id === +mutualId);
+  const base = G.nodes.find(n => n.id === +baseId);
+  if (!node) return;
+  G.mutualDetail = base ? { baseId: base.id, baseName: base.username, targetId: node.id } : null;
+  selectNode(node, { keepMutual: true });
+}
+
+async function setCenterNode(id) {
+  const node = G.nodes.find(n => n.id === +id);
+  if (!node) return;
+  if (G.centerNode) { G.centerNode.fx = null; G.centerNode.fy = null; G.centerNode.pinned = false; }
+  G.centerNode = node;
+  node.pinned = true;
+  node.fx = node.x;
+  node.fy = node.y;
+  updateGraph();
+  closePanel();
+  setStatus('Center set: ' + node.username);
+}
+
+// ══════════════════════════════════════════════
+// SHARED GROUP LINKS
+// ══════════════════════════════════════════════
+function refreshSharedLinks() {
+  const groupNodes = {};
+  for (const node of G.nodes) {
+    for (const g of (node.groups || [])) {
+      if (!g.id) continue;
+      if (!groupNodes[g.id]) groupNodes[g.id] = [];
+      groupNodes[g.id].push(node.id);
+    }
+  }
+
+  const centerId = G.centerNode?.id;
+  for (const link of G.links) {
+    const s = srcId(link), t = tgtId(link);
+    const shared = Object.entries(groupNodes)
+      .filter(([, ids]) => ids.includes(s) && ids.includes(t))
+      .map(([gid]) => gid);
+    link.sharedGroups = shared;
+    link.isExpandedPath = !!link.expandedFrom;
+    link.isMutual = false;
+    link.mutualNodes = [];
+  }
+
+  if (centerId) {
+    for (const node of G.nodes) {
+      if (node.id === centerId) continue;
+      const direct = G.links.find(l => (srcId(l) === centerId && tgtId(l) === node.id) || (srcId(l) === node.id && tgtId(l) === centerId));
+      if (!direct) continue;
+      const mutuals = G.nodes.filter(m => m.id !== node.id && m.id !== centerId &&
+        G.links.some(l => (srcId(l) === node.id && tgtId(l) === m.id) || (srcId(l) === m.id && tgtId(l) === node.id)) &&
+        G.links.some(l => (srcId(l) === centerId && tgtId(l) === m.id) || (srcId(l) === m.id && tgtId(l) === centerId)));
+      if (mutuals.length) {
+        direct.isMutual = true;
+        direct.mutualNodes = mutuals;
+      }
+    }
+  }
+
+  if (G.linkSel) G.linkSel.attr('class', d => getLinkClasses(d));
+}
+
+function getLinkClasses(d) {
+  const classes = [];
+  if (d.isExpandedPath) classes.push('link-expanded');
+  else classes.push(d.sharedGroups?.length ? 'link-shared' : 'link-line');
+  if (d.isMutual) classes.push('link-mutual');
+  return classes.join(' ');
+}
+
+// ══════════════════════════════════════════════
+// PATTERN ANALYSIS
+// ══════════════════════════════════════════════
+function analyzePatterns() {
+  const patterns = [];
+
+  // Shared groups
+  const groupData = {};
+  for (const n of G.nodes) {
+    for (const g of (n.groups || [])) {
+      if (!g.id) continue;
+      if (!groupData[g.id]) groupData[g.id] = { name: g.name, nodes: [] };
+      groupData[g.id].nodes.push(n);
+    }
+  }
+  for (const [gid, group] of Object.entries(groupData).sort(([, a],[, b]) => b.nodes.length - a.nodes.length).slice(0, 6)) {
+    if (group.nodes.length >= 2) {
+      const names = group.nodes.map(n => n.username).slice(0, 4).join(', ');
+      patterns.push({
+        icon: '◈', title: `Shared Group: ${group.name || gid}`,
+        detail: `${group.nodes.length} mapped players share this group: ${names}${group.nodes.length > 4 ? ', ...' : ''}`
+      });
+    }
+  }
+
+  // Online cluster
+  const online = G.nodes.filter(n => n.isOnline || n.presenceType > 0);
+  if (online.length >= 3) patterns.push({
+    icon: '●', title: `${online.length} Players Online`,
+    detail: online.slice(0,5).map(n => n.username).join(', ') + (online.length > 5 ? '...' : '')
+  });
+
+  // In-game cluster
+  const ingame = G.nodes.filter(n => n.presenceType === 2);
+  if (ingame.length >= 2) patterns.push({
+    icon: '▶', title: `${ingame.length} Players In-Game`,
+    detail: ingame.slice(0,4).map(n => n.username).join(', ')
+  });
+
+  // Hub nodes
+  const conns = {};
+  for (const l of G.links) {
+    const s = srcId(l), t = tgtId(l);
+    conns[s] = (conns[s] || 0) + 1;
+    conns[t] = (conns[t] || 0) + 1;
+  }
+  for (const [id, cnt] of Object.entries(conns).sort((a,b) => b[1]-a[1]).slice(0, 3)) {
+    const n = G.nodes.find(x => x.id === +id);
+    if (n && n.id !== G.centerNode?.id && cnt >= 3) patterns.push({
+      icon: '⬡', title: `Hub: ${n.username}`,
+      detail: `Connected to ${cnt} mapped players — social bridge`
+    });
+  }
+
+  // Mutual connection highlights
+  const mutualCounts = G.nodes
+    .filter(n => n.id !== G.centerNode?.id)
+    .map(n => {
+      const mutuals = G.nodes.filter(m => m.id !== n.id && m.id !== G.centerNode?.id &&
+        G.links.some(l => (srcId(l) === n.id && tgtId(l) === m.id) || (srcId(l) === m.id && tgtId(l) === n.id)) &&
+        G.links.some(l => (srcId(l) === G.centerNode?.id && tgtId(l) === m.id) || (srcId(l) === m.id && tgtId(l) === G.centerNode?.id)));
+      return { node: n, count: mutuals.length, mutuals };
+    })
+    .filter(x => x.count > 1)
+    .sort((a,b) => b.count - a.count)
+    .slice(0, 3);
+
+  for (const item of mutualCounts) {
+    const names = item.mutuals.slice(0, 4).map(m => m.username).join(', ');
+    patterns.push({
+      icon: '⤷', title: `Mutuals: ${item.node.username}`,
+      detail: `Shares ${item.count} mutual connections with ${G.centerNode?.username}: ${names}${item.count > 4 ? ', ...' : ''}`
+    });
+  }
+
+  const popular = G.nodes
+    .filter(n => n.id !== G.centerNode?.id && (n.data?.social?.followers || 0) > 0)
+    .sort((a,b) => (b.data?.social?.followers || 0) - (a.data?.social?.followers || 0))
+    .slice(0, 2);
+  for (const n of popular) {
+    patterns.push({
+      icon: '★', title: `Strong profile: ${n.username}`,
+      detail: `${fmtNum(n.data?.social?.followers || 0)} followers — larger node on graph`
+    });
+  }
+
+  // Network depth
+  if (G.nodes.length > 20) {
+    const levels = [...new Set(G.nodes.map(n => n.level || 0))].sort((a,b) => a-b);
+    patterns.push({
+      icon: '↕', title: `Network Depth: ${levels.length} levels`,
+      detail: `${G.nodes.filter(n => n.level === 0).length} core · ${G.nodes.filter(n => n.level === 1).length} direct · ${G.nodes.filter(n => (n.level||0) > 1).length} extended`
+    });
+  }
+
+  // Render
+  const el = document.getElementById('pattern-list');
+  if (!patterns.length) {
+    el.innerHTML = '<div class="pat-item" style="color:var(--text3)">No patterns yet. Expand more nodes to reveal connections.</div>';
+    return;
+  }
+  el.innerHTML = patterns.map(p => `
+    <div class="pat-item">
+      <div class="pat-item-title">${p.icon} ${p.title}</div>
+      <div class="pat-item-detail">${p.detail}</div>
+    </div>`).join('');
+}
+
+// ══════════════════════════════════════════════
+// TOOLTIP
+// ══════════════════════════════════════════════
+function showTip(ev, d) {
+  const [ptext, pclass] = presenceText(d);
+  const chipColor = pclass === 'chip-online' ? 'var(--green)' : pclass === 'chip-ingame' ? 'var(--purple)' : 'var(--text2)';
+  document.getElementById('tooltip').style.display = 'block';
+  document.getElementById('tooltip').innerHTML = `
+    <div class="tt-name">${d.username}</div>
+    ${d.displayName && d.displayName !== d.username ? `<div class="tt-row" style="color:var(--text3)">${d.displayName}</div>` : ''}
+    <div class="tt-row" style="color:${chipColor}">● ${ptext}</div>
+    ${d.groups?.length ? `<div class="tt-row">${d.groups.length} groups loaded</div>` : ''}
+    <div class="tt-row" style="color:var(--text3)">Level ${d.level||0} · ID: ${d.id}</div>
+    <div class="tt-hint">Left: Inspect · Right: Expand</div>
+  `;
+  moveTip(ev);
+}
+function moveTip(ev) {
+  const t = document.getElementById('tooltip');
+  let x = ev.clientX + 16, y = ev.clientY - 10;
+  if (x + 240 > innerWidth) x = ev.clientX - 240;
+  t.style.left = x + 'px'; t.style.top = y + 'px';
+}
+function hideTip() { document.getElementById('tooltip').style.display = 'none'; }
+
+// ══════════════════════════════════════════════
+// CONTEXT MENU
+// ══════════════════════════════════════════════
+function showCtx(ev, node) {
+  G.ctxTarget = node;
+  const m = document.getElementById('ctx-menu');
+  m.style.display = 'block';
+  let x = ev.clientX, y = ev.clientY;
+  if (x + 200 > innerWidth) x -= 200;
+  if (y + 200 > innerHeight) y -= 200;
+  m.style.left = x + 'px'; m.style.top = y + 'px';
+}
+function hideCtx() { document.getElementById('ctx-menu').style.display = 'none'; }
+
+function ctxAction(action) {
+  const node = G.ctxTarget;
+  hideCtx();
+  if (!node) return;
+  if (action === 'inspect') selectNode(node);
+  else if (action === 'expand') expandNode(node.id);
+  else if (action === 'center') setCenterNode(node.id);
+  else if (action === 'profile') window.open(`https://www.roblox.com/users/${node.id}/profile`, '_blank');
+  else if (action === 'pin') {
+    node.pinned = !node.pinned;
+    if (node.pinned) { node.fx = node.x; node.fy = node.y; }
+    else { node.fx = null; node.fy = null; }
+    setStatus(`${node.pinned ? 'Pinned' : 'Unpinned'}: ${node.username}`);
+  }
+}
+
+document.addEventListener('click', e => {
+  if (!document.getElementById('ctx-menu').contains(e.target)) hideCtx();
+});
+
+// ══════════════════════════════════════════════
+// CONTROLS
+// ══════════════════════════════════════════════
+function resetView() {
+  G.svg.transition().duration(700).call(G.zoom.transform, d3.zoomIdentity);
+}
+
+function clearAll() {
+  G.nodes = []; G.links = [];
+  G.centerNode = null; G.selectedNode = null;
+  closePanel();
+  updateGraph();
+  setStatus('CLEARED');
+  document.getElementById('intro').style.display = 'flex';
+  document.getElementById('pattern-list').innerHTML = '<div class="pat-item" style="color:var(--text3)">No patterns yet.</div>';
+}
+
+function togglePatterns() {
+  document.getElementById('pattern-panel').classList.toggle('open');
+}
+
+document.getElementById('pat-toggle').onclick = togglePatterns;
+
+// ══════════════════════════════════════════════
+// KEYBOARD
+// ══════════════════════════════════════════════
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') { closePanel(); hideCtx(); }
+  if (e.key === 'Enter' && document.activeElement === document.getElementById('search-input')) searchUser();
+  if (e.key === 'r' && !e.ctrlKey && document.activeElement.tagName !== 'INPUT') resetView();
+});
+
+document.getElementById('search-btn').onclick = searchUser;
+
+// ══════════════════════════════════════════════
+// INIT
+// ══════════════════════════════════════════════
+initGraph();
+setStatus('READY — Enter a Roblox username to begin network mapping');
+</script>
+</body>
+</html>
