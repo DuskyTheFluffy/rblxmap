@@ -629,7 +629,8 @@ const API = {
         return null;
       }
 
-      return await response.json();
+      const json = await response.json();
+      return json;
 
     } catch (e) {
       console.error('❌ GET Exception:', e);
@@ -655,7 +656,8 @@ const API = {
         return null;
       }
 
-      return await response.json();
+      const json = await response.json();
+      return json;
 
     } catch (e) {
       console.error('❌ POST Exception:', e);
@@ -672,18 +674,26 @@ const API = {
     }
   },
 
+  // ───────── USER LOOKUP ─────────
+
   async getUserByUsername(name) {
+    showLoad('API SEARCH: users.roblox.com/v1/usernames/users', 'blocking');
+
     const d = await this.post(
       'https://users.roblox.com/v1/usernames/users',
       { usernames: [name], excludeBannedUsers: false }
     );
 
-    return d?.data?.[0] || null;
+    if (!d || d.errors) return null;
+    return d.data?.[0] || null;
   },
 
   async getUserInfo(uid) {
+    showLoad(`API FETCH PROFILE: users.roblox.com/v1/users/${uid}`, 'status');
     return this.get(`https://users.roblox.com/v1/users/${uid}`);
   },
+
+  // ───────── AVATARS ─────────
 
   async getAvatarUrl(uid) {
     const d = await this.get(
@@ -692,11 +702,62 @@ const API = {
     return d?.data?.[0]?.imageUrl || null;
   },
 
+  async getAvatarUrls(uids) {
+    if (!uids.length) return {};
+
+    const result = {};
+
+    for (let i = 0; i < uids.length; i += 100) {
+      const chunk = uids.slice(i, i + 100).join(',');
+
+      const d = await this.get(
+        `https://thumbnails.roblox.com/v1/users/avatar-headshot?userIds=${chunk}&size=150x150&format=Png&isCircular=false`
+      );
+
+      for (const item of (d?.data || [])) {
+        result[item.targetId] = item.imageUrl;
+      }
+    }
+
+    return result;
+  },
+
+  // ───────── GROUP ICONS ─────────
+
+  async getGroupIcons(ids) {
+    if (!ids.length) return {};
+
+    showLoad('API FETCH GROUP ICONS', 'status');
+
+    const result = {};
+    const chunk = ids.slice(0, 100).join(',');
+
+    const d = await this.get(
+      `https://thumbnails.roblox.com/v1/groups/icons?groupIds=${chunk}&size=150x150&format=Png&isCircular=false`
+    );
+
+    for (const item of (d?.data || [])) {
+      result[item.targetId] = item.imageUrl;
+    }
+
+    return result;
+  },
+
+  // ───────── FRIENDS / SOCIAL ─────────
+
   async getFriends(uid) {
+    showLoad(`API FETCH FRIEND LIST`, 'status');
     const d = await this.get(
       `https://friends.roblox.com/v1/users/${uid}/friends`
     );
     return d?.data || [];
+  },
+
+  async getFriendCount(uid) {
+    const d = await this.get(
+      `https://friends.roblox.com/v1/users/${uid}/friends/count`
+    );
+    return d?.count || 0;
   },
 
   async getFollowerCount(uid) {
@@ -713,13 +774,46 @@ const API = {
     return d?.count || 0;
   },
 
+  async getFollowerCounts(uids) {
+    const result = {};
+    const batchSize = 8;
+
+    for (let i = 0; i < uids.length; i += batchSize) {
+      const chunk = uids.slice(i, i + batchSize);
+
+      const responses = await Promise.all(
+        chunk.map(async uid => {
+          const d = await this.get(
+            `https://friends.roblox.com/v1/users/${uid}/followers/count`
+          );
+          return { uid, count: d?.count || 0 };
+        })
+      );
+
+      for (const item of responses) {
+        result[item.uid] = item.count;
+      }
+    }
+
+    return result;
+  },
+
+  // ───────── PRESENCE ─────────
+
   async getPresence(uids) {
+    if (!uids.length) return [];
+
+    showLoad('API FETCH PRESENCE', 'status');
+
     const d = await this.post(
       'https://presence.roblox.com/v1/presence/users',
       { userIds: uids }
     );
+
     return d?.userPresences || [];
   },
+
+  // ───────── CONTENT ─────────
 
   async getGroups(uid) {
     const d = await this.get(
