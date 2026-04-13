@@ -1739,7 +1739,9 @@ function analyzePatterns() {
     });
   }
 
-  // Mutual connection highlights (FIXED: full shared-mutual detection + multi-highlight ready)
+// ══════════════════════════════════════════════
+// MUTUAL CONNECTION HIGHLIGHTS (FIXED + SAFE)
+// ══════════════════════════════════════════════
 
 const mutualCounts = G.nodes
   .filter(n => n.id !== G.centerNode?.id)
@@ -1748,13 +1750,13 @@ const mutualCounts = G.nodes
       if (!G.centerNode?.id) return false;
       if (m.id === n.id || m.id === G.centerNode.id) return false;
 
-      // n <-> m connection
+      // connection: n <-> m
       const nToM = G.links.some(l =>
         (srcId(l) === n.id && tgtId(l) === m.id) ||
         (srcId(l) === m.id && tgtId(l) === n.id)
       );
 
-      // center <-> m connection
+      // connection: center <-> m
       const centerToM = G.links.some(l =>
         (srcId(l) === G.centerNode.id && tgtId(l) === m.id) ||
         (srcId(l) === m.id && tgtId(l) === G.centerNode.id)
@@ -1765,12 +1767,16 @@ const mutualCounts = G.nodes
 
     return { node: n, count: mutuals.length, mutuals };
   })
-  .filter(x => x.count > 0) // FIX: include single-mutual relationships
+  .filter(x => x.count > 0)
   .sort((a, b) => b.count - a.count)
   .slice(0, 3);
 
 
-// Build highlight edge set (for yellow lines)
+// ══════════════════════════════════════════════
+// BUILD YELLOW HIGHLIGHT EDGE SET
+// (use this in your link rendering logic)
+// ══════════════════════════════════════════════
+
 const highlightEdges = new Set();
 
 for (const item of mutualCounts) {
@@ -1785,16 +1791,22 @@ for (const item of mutualCounts) {
     highlightEdges.add(`${n.id}-${m.id}`);
     highlightEdges.add(`${m.id}-${n.id}`);
 
-    // OPTIONAL (uncomment if you also want direct triangle emphasis)
+    // OPTIONAL: also highlight center ↔ node direct link
     // highlightEdges.add(`${G.centerNode.id}-${n.id}`);
     // highlightEdges.add(`${n.id}-${G.centerNode.id}`);
   }
 }
 
 
-// Pattern display
+// ══════════════════════════════════════════════
+// PATTERN DISPLAY
+// ══════════════════════════════════════════════
+
 for (const item of mutualCounts) {
-  const names = item.mutuals.slice(0, 4).map(m => m.username).join(', ');
+  const names = item.mutuals
+    .slice(0, 4)
+    .map(m => m.username)
+    .join(', ');
 
   patterns.push({
     icon: '⤷',
@@ -1804,7 +1816,10 @@ for (const item of mutualCounts) {
 }
 
 
-// Popular nodes
+// ══════════════════════════════════════════════
+// POPULAR NODES
+// ══════════════════════════════════════════════
+
 const popular = G.nodes
   .filter(n => n.id !== G.centerNode?.id && (n.data?.social?.followers || 0) > 0)
   .sort((a, b) => (b.data?.social?.followers || 0) - (a.data?.social?.followers || 0))
@@ -1819,35 +1834,41 @@ for (const n of popular) {
 }
 
 
-// Network depth
+// ══════════════════════════════════════════════
+// NETWORK DEPTH
+// ══════════════════════════════════════════════
+
 if (G.nodes.length > 20) {
   const levels = [...new Set(G.nodes.map(n => n.level || 0))].sort((a, b) => a - b);
 
   patterns.push({
     icon: '↕',
     title: `Network Depth: ${levels.length} levels`,
-    detail: `${G.nodes.filter(n => n.level === 0).length} core · ${G.nodes.filter(n => n.level === 1).length} direct · ${G.nodes.filter(n => (n.level || 0) > 1).length} extended`
+    detail:
+      `${G.nodes.filter(n => n.level === 0).length} core · ` +
+      `${G.nodes.filter(n => n.level === 1).length} direct · ` +
+      `${G.nodes.filter(n => (n.level || 0) > 1).length} extended`
   });
 }
 
 
-// Render
+// ══════════════════════════════════════════════
+// RENDER PATTERNS
+// ══════════════════════════════════════════════
+
 const el = document.getElementById('pattern-list');
 
 if (!patterns.length) {
   el.innerHTML =
     '<div class="pat-item" style="color:var(--text3)">No patterns yet. Expand more nodes to reveal connections.</div>';
-  return;
-}
-
-el.innerHTML = patterns
-  .map(p => `
+} else {
+  el.innerHTML = patterns.map(p => `
     <div class="pat-item">
       <div class="pat-item-title">${p.icon} ${p.title}</div>
       <div class="pat-item-detail">${p.detail}</div>
     </div>
-  `)
-  .join('');
+  `).join('');
+}
 
 // ══════════════════════════════════════════════
 // TOOLTIP
@@ -1864,7 +1885,7 @@ function showTip(ev, d) {
     <div class="tt-row" style="color:var(--text3)">Level ${d.level||0} · ID: ${d.id}</div>
     <div class="tt-hint">Left: Inspect · Right: Expand</div>
   `;
-  moveTip(ev);
+  moveTip(ev);}
 }
 function moveTip(ev) {
   const t = document.getElementById('tooltip');
