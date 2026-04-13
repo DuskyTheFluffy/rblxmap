@@ -903,7 +903,7 @@ function presenceText(n) {
 }
 
 // ══════════════════════════════════════════════
-// D3 GRAPH INIT (CLEAN + STABLE)
+// D3 GRAPH INIT (REBUILT - SMOOTH + STABLE)
 // ══════════════════════════════════════════════
 function initGraph() {
   const wrap = document.getElementById('net-wrap');
@@ -914,7 +914,7 @@ function initGraph() {
 
   G.defs = G.svg.append('defs');
 
-  // Glow
+  // Glow filters
   const glow = G.defs.append('filter')
     .attr('id', 'glow')
     .attr('x', '-50%').attr('y', '-50%')
@@ -922,13 +922,15 @@ function initGraph() {
 
   glow.append('feGaussianBlur')
     .attr('stdDeviation', '4')
-    .attr('result', 'coloredBlur');
+    .attr('result', 'blur');
 
-  const fm = glow.append('feMerge');
-  fm.append('feMergeNode').attr('in', 'coloredBlur');
-  fm.append('feMergeNode').attr('in', 'SourceGraphic');
+  glow.append('feMerge')
+    .selectAll('feMergeNode')
+    .data(['blur', 'SourceGraphic'])
+    .enter().append('feMergeNode')
+    .attr('in', d => d);
 
-  // Background grid
+  // Grid
   const patGrid = G.defs.append('pattern')
     .attr('id', 'grid')
     .attr('width', 40)
@@ -936,10 +938,9 @@ function initGraph() {
     .attr('patternUnits', 'userSpaceOnUse');
 
   patGrid.append('path')
-    .attr('d', 'M 40 0 L 0 0 0 40')
-    .attr('fill', 'none')
+    .attr('d', 'M40 0 L0 0 0 40')
     .attr('stroke', 'rgba(20,34,51,.4)')
-    .attr('stroke-width', 0.5);
+    .attr('fill', 'none');
 
   G.svg.append('rect')
     .attr('width', '100%')
@@ -947,91 +948,72 @@ function initGraph() {
     .attr('fill', 'url(#grid)');
 
   // Zoom
-  G.zoom = d3.zoom()
-    .scaleExtent([.06, 5])
-    .on('zoom', e => G.g.attr('transform', e.transform));
-
-  G.svg.call(G.zoom).on('dblclick.zoom', null);
-
-  G.svg.on('click', e => {
-    if (e.target.tagName === 'svg' || e.target.tagName === 'rect') closePanel();
-  });
-
   G.g = G.svg.append('g');
   G.linkG = G.g.append('g');
   G.nodeG = G.g.append('g');
 
-  // 🔥 SIMULATION (lighter + no fighting)
+  G.zoom = d3.zoom()
+    .scaleExtent([0.06, 5])
+    .on('zoom', e => G.g.attr('transform', e.transform));
+
+  G.svg.call(G.zoom).on('dblclick.zoom', null);
+
+  // CLEAN SIMULATION (less chaotic)
   G.sim = d3.forceSimulation()
-    .force('link', d3.forceLink()
-      .id(d => d.id)
-      .distance(180)
-      .strength(0.5)
-    )
-    .force('charge', d3.forceManyBody()
-      .strength(-500)
-    )
+    .force('charge', d3.forceManyBody().strength(-220))
     .force('center', d3.forceCenter(W / 2, H / 2).strength(0.05))
-    .force('collide', d3.forceCollide(d => nodeR(d) + 12))
+    .force('collision', d3.forceCollide(d => nodeR(d) + 12))
+    .alphaDecay(0.08)
+    .velocityDecay(0.4)
     .on('tick', onTick);
 }
 
 // ══════════════════════════════════════════════
-// NODE SIZE
+// PERFECT CIRCLE POSITIONING (CORE FIX)
 // ══════════════════════════════════════════════
-function nodeR(d) {
-  let base = 22;
-  if (d.id === G.centerNode?.id) base = 42;
-  else if (d.level === 1) base = 28;
+function layoutChildrenCircle(parent) {
+  if (!parent || parent.x == null || parent.y == null) return;
 
-  const followers = d.data?.social?.followers || 0;
-  return base + Math.log10(followers + 1) * 4;
-}
+  const childrenLinks = G.links.filter(l => l.expandedFrom === parent.id);
+  if (!childrenLinks.length) return;
 
-// ══════════════════════════════════════════════
-// PERFECT CIRCLE LAYOUT (KEY FIX)
-// ══════════════════════════════════════════════
-function layoutExpandedChildren(parent) {
-  if (!parent) return;
-
-  const links = G.links.filter(l => l.expandedFrom === parent.id);
-  if (!links.length) return;
-
-  const children = links.map(l => {
+  const children = childrenLinks.map(l => {
     const id = srcId(l) === parent.id ? tgtId(l) : srcId(l);
     return G.nodes.find(n => n.id === id);
   }).filter(Boolean);
 
-  if (!children.length) return;
+  const count = children.length;
+  if (!count) return;
 
-  const radius = 200 + nodeR(parent);
-  const step = (Math.PI * 2) / children.length;
+  const radius = Math.max(180, 60 + nodeR(parent) * 2);
 
   children.forEach((child, i) => {
-    const angle = i * step;
+    const angle = (i / count) * Math.PI * 2;
 
-    const tx = parent.x + Math.cos(angle) * radius;
-    const ty = parent.y + Math.sin(angle) * radius;
+    const targetX = parent.x + Math.cos(angle) * radius;
+    const targetY = parent.y + Math.sin(angle) * radius;
 
-    // Smooth interpolation (NO JITTER)
-    child.x += (tx - child.x) * 0.25;
-    child.y += (ty - child.y) * 0.25;
+    // SMOOTH interpolation instead of snapping
+    child.x += (targetX - child.x) * 0.15;
+    child.y += (targetY - child.y) * 0.15;
 
-    // Lock them (prevents physics fighting)
-    child.fx = child.x;
-    child.fy = child.y;
+    // Light pinning so sim doesn't break circle
+    child.vx *= 0.6;
+    child.vy *= 0.6;
   });
 }
 
 // ══════════════════════════════════════════════
-// TICK
+// TICK (SMOOTH + CONTROLLED)
 // ══════════════════════════════════════════════
 function onTick() {
-  // 🔥 enforce circle every frame
+
+  // Apply circle layout every frame (this is the key)
   if (G.centerNode) {
-    layoutExpandedChildren(G.centerNode);
+    layoutChildrenCircle(G.centerNode);
   }
 
+  // Links
   if (G.linkSel) {
     G.linkSel
       .attr('x1', d => d.source.x)
@@ -1040,6 +1022,7 @@ function onTick() {
       .attr('y2', d => d.target.y);
   }
 
+  // Nodes
   if (G.nodeSel) {
     G.nodeSel
       .attr('transform', d => `translate(${d.x || 0},${d.y || 0})`);
@@ -1047,7 +1030,7 @@ function onTick() {
 }
 
 // ══════════════════════════════════════════════
-// GRAPH UPDATE
+// GRAPH UPDATE (CLEAN + FAST)
 // ══════════════════════════════════════════════
 function updateGraph() {
 
@@ -1061,23 +1044,35 @@ function updateGraph() {
   G.nodeSel = G.nodeG.selectAll('g.node')
     .data(G.nodes, d => d.id)
     .join(enter => {
+
       const ng = enter.append('g')
         .attr('class', 'node')
         .style('cursor', 'pointer');
 
       ng.append('circle')
+        .attr('r', d => nodeR(d) + 5)
+        .attr('stroke', d => nodeColor(d))
+        .attr('fill', 'none')
+        .attr('opacity', 0.4)
+        .attr('filter', 'url(#glow)');
+
+      ng.append('circle')
         .attr('r', d => nodeR(d))
-        .attr('fill', '#0b1219')
-        .attr('stroke', d => nodeColor(d));
+        .attr('fill', '#0b1219');
+
+      ng.append('circle')
+        .attr('r', d => nodeR(d))
+        .attr('stroke', d => nodeColor(d))
+        .attr('fill', 'none');
 
       ng.append('text')
         .attr('y', d => nodeR(d) + 12)
         .attr('text-anchor', 'middle')
-        .attr('fill', '#a8c8d8')
         .attr('font-size', '10px')
+        .attr('fill', '#a8c8d8')
         .text(d => d.username);
 
-      // 🔥 DRAG (clean + circle-aware)
+      // DRAG (FIXED + SMOOTH)
       ng.call(
         d3.drag()
           .on('start', (ev, d) => {
@@ -1089,29 +1084,38 @@ function updateGraph() {
             d.fx = ev.x;
             d.fy = ev.y;
 
-            // instantly reflow circle
-            if (d.id === G.centerNode?.id) {
-              layoutExpandedChildren(d);
-            }
+            // Move children WITH parent (no lag)
+            const links = G.links.filter(l => l.expandedFrom === d.id);
+
+            links.forEach(link => {
+              const id = srcId(link) === d.id ? tgtId(link) : srcId(link);
+              const child = G.nodes.find(n => n.id === id);
+              if (child) {
+                child.x += (ev.dx || 0);
+                child.y += (ev.dy || 0);
+              }
+            });
           })
           .on('end', (ev, d) => {
             if (!ev.active) G.sim.alphaTarget(0);
-
-            if (d.id !== G.centerNode?.id) {
+            if (!d.pinned) {
               d.fx = null;
               d.fy = null;
             }
           })
       );
 
+      ng.on('click', (ev, d) => {
+        ev.stopPropagation();
+        selectNode(d);
+      });
+
       return ng;
     });
 
-  // SIM
+  // SIM UPDATE
   G.sim.nodes(G.nodes);
-  G.sim.force('link').links(G.links);
-
-  G.sim.alpha(0.5).restart();
+  G.sim.alpha(0.4).restart();
 }
   
 
