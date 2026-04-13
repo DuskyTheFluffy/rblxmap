@@ -603,36 +603,26 @@ const G = {
 };
 
 // ══════════════════════════════════════════════
-// LOCAL PROXY WORKER SETUP
-// ══════════════════════════════════════════════
-(function initLocalProxy() {
-  const workerScript = document.createElement('script');
-  workerScript.src = 'proxy-worker.js';
-  workerScript.async = true;
-  document.head.appendChild(workerScript);
-})();
-
-// ══════════════════════════════════════════════
-// API MODULE
+// API MODULE (Uses Public CORS Proxies)
 // ══════════════════════════════════════════════
 const API = {
-  // Local proxy URL (runs in browser)
-  localProxyUrl: '/proxy/',
+  // Primary public CORS proxy - no setup needed!
+  proxyUrl: 'https://corsproxy.io/?',
   
-  // Fallback public proxies if local fails
+  // Fallback proxies if main one fails
   fallbackProxies: [
-    'https://corsproxy.io/?',
-    'https://api.allorigins.win/raw?url='
+    'https://api.allorigins.win/raw?url=',
+    'https://api.codetabs.com/v1/proxy?quest='
   ],
   
   async get(url) {
     try {
-      const proxiedUrl = this.localProxyUrl + encodeURIComponent(url);
+      const proxiedUrl = this.proxyUrl + encodeURIComponent(url);
       showLoad(`API GET: ${this.formatEndpoint(url)}`, 'status');
       console.log('📡 API GET:', url);
       
-      // Try local proxy first
       let response;
+      // Try main proxy first
       try {
         response = await fetch(proxiedUrl, { 
           mode: 'cors', 
@@ -642,7 +632,7 @@ const API = {
           }
         });
       } catch (localError) {
-        console.log('Local proxy failed, using fallback...');
+        console.log('Main proxy failed, using fallback...');
         // Fallback to public proxies
         for (const proxy of this.fallbackProxies) {
           try {
@@ -672,12 +662,12 @@ const API = {
   },
   async post(url, body) {
     try {
-      const proxiedUrl = this.localProxyUrl + encodeURIComponent(url);
+      const proxiedUrl = this.proxyUrl + encodeURIComponent(url);
       showLoad(`API POST: ${this.formatEndpoint(url)}`, 'status');
       console.log('📡 API POST:', url, body);
       
-      // Try local proxy first
       let response;
+      // Try main proxy first
       try {
         response = await fetch(proxiedUrl, {
           method: 'POST',
@@ -690,7 +680,7 @@ const API = {
           credentials: 'omit'
         });
       } catch (localError) {
-        console.log('Local proxy failed, using fallback...');
+        console.log('Main proxy failed, using fallback...');
         // Fallback to public proxies
         for (const proxy of this.fallbackProxies) {
           try {
