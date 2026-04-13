@@ -603,50 +603,24 @@ const G = {
 };
 
 // ══════════════════════════════════════════════
-// API MODULE (Uses Public CORS Proxies)
+// API MODULE (Uses Cloudflare Worker Proxy)
 // ══════════════════════════════════════════════
 const API = {
-  // Primary public CORS proxy - no setup needed!
-  proxyUrl: 'https://corsproxy.io/?',
-  
-  // Fallback proxies if main one fails
-  fallbackProxies: [
-    'https://api.allorigins.win/raw?url=',
-    'https://api.codetabs.com/v1/proxy?quest='
-  ],
+  // Deployed Cloudflare Worker URL
+  workerUrl: 'https://empty-sunset-dfa1.kcbw679zk4.workers.dev/?url=',
   
   async get(url) {
     try {
-      const proxiedUrl = this.proxyUrl + encodeURIComponent(url);
+      const proxiedUrl = this.workerUrl + encodeURIComponent(url);
       showLoad(`API GET: ${this.formatEndpoint(url)}`, 'status');
       console.log('📡 API GET:', url);
       
-      let response;
-      // Try main proxy first
-      try {
-        response = await fetch(proxiedUrl, { 
-          mode: 'cors', 
-          credentials: 'omit',
-          headers: {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
-          }
-        });
-      } catch (localError) {
-        console.log('Main proxy failed, using fallback...');
-        // Fallback to public proxies
-        for (const proxy of this.fallbackProxies) {
-          try {
-            response = await fetch(proxy + encodeURIComponent(url), { 
-              mode: 'cors', 
-              credentials: 'omit',
-              headers: {
-                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
-              }
-            });
-            break;
-          } catch (err) { continue; }
+      const response = await fetch(proxiedUrl, { 
+        method: 'GET',
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
         }
-      }
+      });
       
       console.log('📡 GET Status:', response.status, response.statusText);
       if (response.ok) {
@@ -662,42 +636,18 @@ const API = {
   },
   async post(url, body) {
     try {
-      const proxiedUrl = this.proxyUrl + encodeURIComponent(url);
+      const proxiedUrl = this.workerUrl + encodeURIComponent(url);
       showLoad(`API POST: ${this.formatEndpoint(url)}`, 'status');
       console.log('📡 API POST:', url, body);
       
-      let response;
-      // Try main proxy first
-      try {
-        response = await fetch(proxiedUrl, {
-          method: 'POST',
-          headers: { 
-            'Content-Type': 'application/json',
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
-          },
-          body: JSON.stringify(body),
-          mode: 'cors', 
-          credentials: 'omit'
-        });
-      } catch (localError) {
-        console.log('Main proxy failed, using fallback...');
-        // Fallback to public proxies
-        for (const proxy of this.fallbackProxies) {
-          try {
-            response = await fetch(proxy + encodeURIComponent(url), { 
-              method: 'POST',
-              headers: { 
-                'Content-Type': 'application/json',
-                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
-              },
-              body: JSON.stringify(body),
-              mode: 'cors', 
-              credentials: 'omit'
-            });
-            break;
-          } catch (err) { continue; }
-        }
-      }
+      const response = await fetch(proxiedUrl, {
+        method: 'POST',
+        headers: { 
+          'Content-Type': 'application/json',
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+        },
+        body: JSON.stringify(body)
+      });
       
       console.log('📡 POST Status:', response.status, response.statusText);
       if (response.ok) {
