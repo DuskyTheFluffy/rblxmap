@@ -947,23 +947,25 @@ function initGraph() {
   G.nodeG = G.g.append('g').attr('class', 'nodes');
 
   // Simulation
-  G.sim = d3.forceSimulation()
-    .force('link', d3.forceLink().id(d => d.id).distance(d => {
+G.sim = d3.forceSimulation()
+  .force('link', d3.forceLink()
+    .id(d => d.id)
+    .distance(d => {
       const isCenter = srcId(d) === G.centerNode?.id || tgtId(d) === G.centerNode?.id;
       const baseDistance = isCenter ? 220 : 180;
       const expandedBonus = d.expandedFrom ? 40 : 0;
       return baseDistance + expandedBonus + ((nodeR(d.source) + nodeR(d.target)) / 2);
-    }).strength(.72))
-    .force('charge', d3.forceManyBody().strength(-640).distanceMax(700))
-    .force('center', d3.forceCenter(W / 2, H / 2).strength(.04))
-    .force('collide', d3.forceCollide(d => nodeR(d) + 30).iterations(4))
-    .on('tick', onTick);
-
-  window.addEventListener('resize', () => {
-    const w2 = wrap.clientWidth, h2 = wrap.clientHeight;
-    G.sim.force('center', d3.forceCenter(w2 / 2, h2 / 2).strength(.04));
-  });
-}
+    })
+    .strength(.72)
+  )
+  .force('charge', d3.forceManyBody()
+    .strength(-640)
+    .distanceMax(700)
+  )
+  .force('center', d3.forceCenter(W / 2, H / 2).strength(.04))
+  .force('collide', d3.forceCollide(d => nodeR(d) + 30).iterations(4))
+  .velocityDecay(0.55)   // ✅ smooth movement (KEEP HERE ONLY)
+  .on('tick', onTick);
 
 function nodeR(d) {
   if (!d) return 28;
@@ -1021,7 +1023,9 @@ function updateGraph() {
         const cp = en.append('clipPath')
           .attr('class','nc')
           .attr('id', d => `c-${d.id}`);
-        cp.append('circle').attr('r', d => nodeR(d));
+
+        cp.append('circle')
+          .attr('r', d => nodeR(d));
       },
       up => up.select('circle').attr('r', d => nodeR(d)),
       ex => ex.remove()
@@ -1046,23 +1050,19 @@ function updateGraph() {
           .attr('class','node')
           .style('cursor','pointer');
 
-        // Outer glow
         ng.append('circle')
           .attr('class','ring')
           .attr('r', d => nodeR(d) + 5)
           .attr('fill','none')
           .attr('stroke', d => nodeColor(d))
-          .attr('stroke-width', 1)
           .attr('opacity', .4)
           .attr('filter','url(#glow)');
 
-        // Background
         ng.append('circle')
           .attr('class','bg-circle')
           .attr('r', d => nodeR(d))
           .attr('fill','#0b1219');
 
-        // Avatar
         ng.append('image')
           .attr('class','av-img')
           .attr('x', d => -nodeR(d))
@@ -1070,29 +1070,14 @@ function updateGraph() {
           .attr('width', d => nodeR(d) * 2)
           .attr('height', d => nodeR(d) * 2)
           .attr('clip-path', d => `url(#c-${d.id})`)
-          .attr('preserveAspectRatio','xMidYMid slice')
           .attr('href', d => d.avatarUrl || '');
 
-        // Border
         ng.append('circle')
           .attr('class','border-ring')
           .attr('r', d => nodeR(d))
           .attr('fill','none')
-          .attr('stroke', d => nodeColor(d))
-          .attr('stroke-width', d => d.id === G.centerNode?.id ? 2.5 : 1.5)
-          .attr('filter', d => (d.isOnline || d.id === G.centerNode?.id) ? 'url(#glow)' : null);
+          .attr('stroke', d => nodeColor(d));
 
-        // Expanded dot
-        ng.append('circle')
-          .attr('class','exp-dot')
-          .attr('cx', d => nodeR(d) - 7)
-          .attr('cy', d => -(nodeR(d) - 7))
-          .attr('r', 5)
-          .attr('fill', d => d.expanded ? '#3dff5c' : '#142233')
-          .attr('stroke','#060a0e')
-          .attr('stroke-width',1.5);
-
-        // Online dot
         ng.append('circle')
           .attr('class','on-dot')
           .attr('cx', d => -(nodeR(d) - 7))
@@ -1101,23 +1086,21 @@ function updateGraph() {
           .attr('fill', d => {
             if (d.isBanned) return '#ff3f5e';
             const pt = d.presenceType ?? (d.isOnline ? 1 : 0);
-            if (pt === 2 || pt === 3) return '#b14eff';
             return pt > 0 ? '#3dff5c' : 'transparent';
           });
 
-        // Label
         ng.append('text')
           .attr('class','node-lbl')
           .attr('y', d => nodeR(d) + 13)
           .attr('text-anchor','middle')
           .attr('font-size', d => d.id === G.centerNode?.id ? '11px' : '9.5px')
           .attr('fill', d => d.id === G.centerNode?.id ? '#00e8ff' : '#a8c8d8')
-          .text(d => d.username.length > 16 ? d.username.slice(0,15) + '…' : d.username);
+          .text(d => d.username);
 
-        // 🔥 SMOOTH DRAG SYSTEM
+        // ── SMOOTH DRAG (FIXED)
         ng.call(d3.drag()
           .on('start', (ev, d) => {
-            if (!ev.active) G.sim.alphaTarget(0.1); // LOW energy
+            if (!ev.active && G.sim) G.sim.alphaTarget(0.08);
             d.fx = d.x;
             d.fy = d.y;
           })
@@ -1126,7 +1109,7 @@ function updateGraph() {
             d.fy = ev.y;
           })
           .on('end', (ev, d) => {
-            if (!ev.active) G.sim.alphaTarget(0);
+            if (!ev.active && G.sim) G.sim.alphaTarget(0);
             if (!d.pinned && d.id !== G.centerNode?.id) {
               d.fx = null;
               d.fy = null;
@@ -1134,33 +1117,12 @@ function updateGraph() {
           })
         );
 
-        // Interactions
-        ng.on('click', (ev, d) => {
-          ev.stopPropagation();
-          hideCtx();
-          selectNode(d);
-        })
-        .on('contextmenu', (ev, d) => {
-          ev.preventDefault();
-          ev.stopPropagation();
-          showCtx(ev, d);
-        })
-        .on('mouseenter', (ev, d) => showTip(ev, d))
-        .on('mousemove', moveTip)
-        .on('mouseleave', hideTip);
-
         return ng;
       },
 
-      // ── UPDATE
       up => {
-        up.select('.ring')
-          .attr('stroke', d => nodeColor(d))
-          .attr('r', d => nodeR(d) + 5);
-
-        up.select('.bg-circle')
-          .attr('r', d => nodeR(d));
-
+        up.select('.ring').attr('r', d => nodeR(d) + 5);
+        up.select('.bg-circle').attr('r', d => nodeR(d));
         up.select('.av-img')
           .attr('x', d => -nodeR(d))
           .attr('y', d => -nodeR(d))
@@ -1170,19 +1132,12 @@ function updateGraph() {
 
         up.select('.border-ring')
           .attr('r', d => nodeR(d))
-          .attr('stroke', d => nodeColor(d))
-          .attr('stroke-width', d => d.id === G.centerNode?.id ? 2.5 : 1.5);
-
-        up.select('.exp-dot')
-          .attr('cx', d => nodeR(d) - 7)
-          .attr('cy', d => -(nodeR(d) - 7))
-          .attr('fill', d => d.expanded ? '#3dff5c' : '#142233');
+          .attr('stroke', d => nodeColor(d));
 
         up.select('.on-dot')
           .attr('fill', d => {
             if (d.isBanned) return '#ff3f5e';
             const pt = d.presenceType ?? (d.isOnline ? 1 : 0);
-            if (pt === 2 || pt === 3) return '#b14eff';
             return pt > 0 ? '#3dff5c' : 'transparent';
           });
 
@@ -1192,11 +1147,14 @@ function updateGraph() {
       ex => ex.remove()
     );
 
-  // ── SIMULATION UPDATE (SMOOTH)
-  G.sim.nodes(G.nodes);
-  G.sim.force('link').links(G.links);
+  // ── SAFE SIMULATION UPDATE
+  if (!G.sim) return;
 
-  // 🔥 MUCH LOWER = smoother
+  G.sim.nodes(G.nodes);
+
+  const linkForce = G.sim.force('link');
+  if (linkForce) linkForce.links(G.links);
+
   G.sim.alpha(0.15).restart();
 
   updateStats();
