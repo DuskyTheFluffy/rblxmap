@@ -964,8 +964,7 @@ G.sim = d3.forceSimulation()
   )
   .force('center', d3.forceCenter(W / 2, H / 2).strength(.04))
   .force('collide', d3.forceCollide(d => nodeR(d) + 30).iterations(4))
-  .velocityDecay(0.55)   // ✅ smooth movement (KEEP HERE ONLY)
-  .on('tick', onTick);
+  .on('tick', onTick);as
 
 function nodeR(d) {
   if (!d) return 28;
