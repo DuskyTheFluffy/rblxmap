@@ -1012,12 +1012,21 @@ function onTick() {
 // ══════════════════════════════════════════════
 // GRAPH UPDATE
 // ══════════════════════════════════════════════
+G.sim
+  .velocityDecay(0.5)   // smoother movement
+  .alphaDecay(0.1);     // faster stabilization
+  
 function updateGraph() {
   // ── Clip paths
   G.defs.selectAll('clipPath.nc')
     .data(G.nodes, d => d.id)
     .join(
-      en => { const cp = en.append('clipPath').attr('class','nc').attr('id', d => `c-${d.id}`); cp.append('circle').attr('r', d => nodeR(d)); },
+      en => {
+        const cp = en.append('clipPath')
+          .attr('class','nc')
+          .attr('id', d => `c-${d.id}`);
+        cp.append('circle').attr('r', d => nodeR(d));
+      },
       up => up.select('circle').attr('r', d => nodeR(d)),
       ex => ex.remove()
     );
@@ -1033,14 +1042,17 @@ function updateGraph() {
     );
 
   // ── Nodes
-  const enter = G.nodeG.selectAll('g.node')
+  G.nodeSel = G.nodeG.selectAll('g.node')
     .data(G.nodes, d => d.id)
     .join(
       en => {
-        const ng = en.append('g').attr('class','node').style('cursor','pointer');
+        const ng = en.append('g')
+          .attr('class','node')
+          .style('cursor','pointer');
 
-        // Outer glow ring
-        ng.append('circle').attr('class','ring')
+        // Outer glow
+        ng.append('circle')
+          .attr('class','ring')
           .attr('r', d => nodeR(d) + 5)
           .attr('fill','none')
           .attr('stroke', d => nodeColor(d))
@@ -1048,13 +1060,15 @@ function updateGraph() {
           .attr('opacity', .4)
           .attr('filter','url(#glow)');
 
-        // Avatar circle background
-        ng.append('circle').attr('class','bg-circle')
+        // Background
+        ng.append('circle')
+          .attr('class','bg-circle')
           .attr('r', d => nodeR(d))
           .attr('fill','#0b1219');
 
-        // Avatar image
-        ng.append('image').attr('class','av-img')
+        // Avatar
+        ng.append('image')
+          .attr('class','av-img')
           .attr('x', d => -nodeR(d))
           .attr('y', d => -nodeR(d))
           .attr('width', d => nodeR(d) * 2)
@@ -1063,24 +1077,30 @@ function updateGraph() {
           .attr('preserveAspectRatio','xMidYMid slice')
           .attr('href', d => d.avatarUrl || '');
 
-        // Border ring
-        ng.append('circle').attr('class','border-ring')
+        // Border
+        ng.append('circle')
+          .attr('class','border-ring')
           .attr('r', d => nodeR(d))
           .attr('fill','none')
           .attr('stroke', d => nodeColor(d))
           .attr('stroke-width', d => d.id === G.centerNode?.id ? 2.5 : 1.5)
           .attr('filter', d => (d.isOnline || d.id === G.centerNode?.id) ? 'url(#glow)' : null);
 
-        // Expanded dot (top-right)
-        ng.append('circle').attr('class','exp-dot')
-          .attr('cx', d => nodeR(d) - 7).attr('cy', d => -(nodeR(d) - 7))
+        // Expanded dot
+        ng.append('circle')
+          .attr('class','exp-dot')
+          .attr('cx', d => nodeR(d) - 7)
+          .attr('cy', d => -(nodeR(d) - 7))
           .attr('r', 5)
           .attr('fill', d => d.expanded ? '#3dff5c' : '#142233')
-          .attr('stroke','#060a0e').attr('stroke-width',1.5);
+          .attr('stroke','#060a0e')
+          .attr('stroke-width',1.5);
 
-        // Online dot (top-left)
-        ng.append('circle').attr('class','on-dot')
-          .attr('cx', d => -(nodeR(d) - 7)).attr('cy', d => -(nodeR(d) - 7))
+        // Online dot
+        ng.append('circle')
+          .attr('class','on-dot')
+          .attr('cx', d => -(nodeR(d) - 7))
+          .attr('cy', d => -(nodeR(d) - 7))
           .attr('r', 4)
           .attr('fill', d => {
             if (d.isBanned) return '#ff3f5e';
@@ -1089,65 +1109,99 @@ function updateGraph() {
             return pt > 0 ? '#3dff5c' : 'transparent';
           });
 
-        // Username label
-        ng.append('text').attr('class','node-lbl')
+        // Label
+        ng.append('text')
+          .attr('class','node-lbl')
           .attr('y', d => nodeR(d) + 13)
           .attr('text-anchor','middle')
           .attr('font-size', d => d.id === G.centerNode?.id ? '11px' : '9.5px')
           .attr('fill', d => d.id === G.centerNode?.id ? '#00e8ff' : '#a8c8d8')
           .text(d => d.username.length > 16 ? d.username.slice(0,15) + '…' : d.username);
 
+        // 🔥 SMOOTH DRAG SYSTEM
+        ng.call(d3.drag()
+          .on('start', (ev, d) => {
+            if (!ev.active) G.sim.alphaTarget(0.1); // LOW energy
+            d.fx = d.x;
+            d.fy = d.y;
+          })
+          .on('drag', (ev, d) => {
+            d.fx = ev.x;
+            d.fy = ev.y;
+          })
+          .on('end', (ev, d) => {
+            if (!ev.active) G.sim.alphaTarget(0);
+            if (!d.pinned && d.id !== G.centerNode?.id) {
+              d.fx = null;
+              d.fy = null;
+            }
+          })
+        );
+
         // Interactions
-        ng.on('click', (ev, d) => { ev.stopPropagation(); hideCtx(); selectNode(d); })
-          .on('contextmenu', (ev, d) => { ev.preventDefault(); ev.stopPropagation(); showCtx(ev, d); })
-          .on('mouseenter', (ev, d) => showTip(ev, d))
-          .on('mousemove', moveTip)
-          .on('mouseleave', hideTip)
-          .call(d3.drag()
-            .on('start', (ev, d) => { if (!ev.active) G.sim.alphaTarget(.3).restart(); d.fx = d.x; d.fy = d.y; })
-            .on('drag',  (ev, d) => { d.fx = ev.x; d.fy = ev.y; })
-            .on('end',   (ev, d) => { if (!ev.active) G.sim.alphaTarget(0); if (!d.pinned && d.id !== G.centerNode?.id) { d.fx = null; d.fy = null; } })
-          );
+        ng.on('click', (ev, d) => {
+          ev.stopPropagation();
+          hideCtx();
+          selectNode(d);
+        })
+        .on('contextmenu', (ev, d) => {
+          ev.preventDefault();
+          ev.stopPropagation();
+          showCtx(ev, d);
+        })
+        .on('mouseenter', (ev, d) => showTip(ev, d))
+        .on('mousemove', moveTip)
+        .on('mouseleave', hideTip);
 
         return ng;
       },
+
+      // ── UPDATE
       up => {
-        up.select('.ring').attr('stroke', d => nodeColor(d)).attr('r', d => nodeR(d) + 5);
-        up.select('.bg-circle').attr('r', d => nodeR(d));
+        up.select('.ring')
+          .attr('stroke', d => nodeColor(d))
+          .attr('r', d => nodeR(d) + 5);
+
+        up.select('.bg-circle')
+          .attr('r', d => nodeR(d));
+
         up.select('.av-img')
-          .attr('x', d => -nodeR(d)).attr('y', d => -nodeR(d))
-          .attr('width', d => nodeR(d) * 2).attr('height', d => nodeR(d) * 2)
+          .attr('x', d => -nodeR(d))
+          .attr('y', d => -nodeR(d))
+          .attr('width', d => nodeR(d) * 2)
+          .attr('height', d => nodeR(d) * 2)
           .attr('href', d => d.avatarUrl || '');
+
         up.select('.border-ring')
           .attr('r', d => nodeR(d))
           .attr('stroke', d => nodeColor(d))
-          .attr('stroke-width', d => d.id === G.centerNode?.id ? 2.5 : 1.5)
-          .attr('filter', d => (d.isOnline || d.id === G.centerNode?.id) ? 'url(#glow)' : null);
+          .attr('stroke-width', d => d.id === G.centerNode?.id ? 2.5 : 1.5);
+
         up.select('.exp-dot')
-          .attr('cx', d => nodeR(d) - 7).attr('cy', d => -(nodeR(d) - 7))
+          .attr('cx', d => nodeR(d) - 7)
+          .attr('cy', d => -(nodeR(d) - 7))
           .attr('fill', d => d.expanded ? '#3dff5c' : '#142233');
+
         up.select('.on-dot')
-          .attr('cx', d => -(nodeR(d) - 7)).attr('cy', d => -(nodeR(d) - 7))
           .attr('fill', d => {
             if (d.isBanned) return '#ff3f5e';
             const pt = d.presenceType ?? (d.isOnline ? 1 : 0);
             if (pt === 2 || pt === 3) return '#b14eff';
             return pt > 0 ? '#3dff5c' : 'transparent';
           });
-        up.select('.node-lbl')
-          .attr('y', d => nodeR(d) + 13)
-          .attr('font-size', d => d.id === G.centerNode?.id ? '11px' : '9.5px')
-          .attr('fill', d => d.id === G.centerNode?.id ? '#00e8ff' : '#a8c8d8');
+
         return up;
       },
+
       ex => ex.remove()
     );
 
-  G.nodeSel = G.nodeG.selectAll('g.node');
-
+  // ── SIMULATION UPDATE (SMOOTH)
   G.sim.nodes(G.nodes);
   G.sim.force('link').links(G.links);
-  G.sim.alpha(.35).restart();
+
+  // 🔥 MUCH LOWER = smoother
+  G.sim.alpha(0.15).restart();
 
   updateStats();
 }
