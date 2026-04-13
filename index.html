@@ -1301,13 +1301,19 @@ async function searchUser() {
 }
 
 // ══════════════════════════════════════════════
-// EXPAND NODE
+// EXPAND NODE (FIXED FOR RADIAL SYSTEM)
+// ══════════════════════════════════════════════
 async function expandNode(nodeId) {
   const node = G.nodes.find(n => n.id === +nodeId);
   if (!node) return;
-  if (node.expanded) { setStatus(`${node.username} already expanded`); return; }
+
+  if (node.expanded) {
+    setStatus(`${node.username} already expanded`);
+    return;
+  }
 
   node.expanded = true;
+
   showLoad(`EXPANDING ${node.username.toUpperCase()} — fetching friends and groups`, 'blocking');
   setStatus('Expanding: ' + node.username);
 
@@ -1316,19 +1322,25 @@ async function expandNode(nodeId) {
     API.getGroups(node.id),
   ]);
 
-  // Update node groups if not loaded
+  // ── Load groups if needed
   if (!node.groups.length && groups.length) {
     const gids = groups.map(g => g.group?.id).filter(Boolean);
     const icons = gids.length ? await API.getGroupIcons(gids) : {};
+
     node.data = node.data || {};
     node.data.groups = groups.map(g => ({ ...g, _icon: icons[g.group?.id] || null }));
-    node.groups = node.data.groups.map(g => ({ id: g.group?.id, name: g.group?.name, icon: g._icon }));
+    node.groups = node.data.groups.map(g => ({
+      id: g.group?.id,
+      name: g.group?.name,
+      icon: g._icon
+    }));
   }
 
-  const newFriends = friends.filter(f => !G.nodes.find(n => n.id === +f.id));
-  const newIds = newFriends.map(f => +f.id);
+  const existingIds = new Set(G.nodes.map(n => n.id));
+  const newIds = friends.map(f => +f.id).filter(id => !existingIds.has(id));
 
   showLoad('LOADING expanded friend avatars, follower counts, and presence', 'blocking');
+
   const [avatarMap, followerMap, presences] = await Promise.all([
     newIds.length ? API.getAvatarUrls(newIds) : Promise.resolve({}),
     newIds.length ? API.getFollowerCounts(newIds) : Promise.resolve({}),
@@ -1339,10 +1351,14 @@ async function expandNode(nodeId) {
   for (const p of presences) presMap[+p.userId] = p;
 
   let added = 0;
+
   for (const f of friends) {
     const fid = +f.id;
-    if (!G.nodes.find(n => n.id === fid)) {
+
+    // ── Add node if new
+    if (!existingIds.has(fid)) {
       const ptype = presMap[fid]?.userPresenceType || 0;
+
       G.nodes.push({
         id: fid,
         username: f.name,
@@ -1351,30 +1367,62 @@ async function expandNode(nodeId) {
         isOnline: f.isOnline || ptype > 0,
         isBanned: fid === -1,
         presenceType: ptype,
-        expanded: false, pinned: false, level: (node.level || 1) + 1,
+        expanded: false,
+        pinned: false,
+        level: (node.level || 1) + 1,
         sourceId: node.id,
         groups: [],
-        data: { presence: presMap[fid], social: { followers: followerMap[fid] || 0 } },
+        data: {
+          presence: presMap[fid],
+          social: { followers: followerMap[fid] || 0 }
+        },
         dataLoaded: false,
+
+        // 🔥 IMPORTANT: spawn near parent (prevents jump-in from corner)
+        x: node.x + (Math.random() - 0.5) * 50,
+        y: node.y + (Math.random() - 0.5) * 50
       });
+
       added++;
     }
+
+    // ── Add link
     const lid = linkId(node.id, fid);
     if (!G.links.find(l => l.id === lid)) {
-      G.links.push({ id: lid, source: node.id, target: fid, sharedGroups: [], expandedFrom: node.id });
+      G.links.push({
+        id: lid,
+        source: node.id,
+        target: fid,
+
+        // 🔥 REQUIRED FOR CIRCLE
+        expandedFrom: node.id,
+
+        sharedGroups: []
+      });
     }
   }
 
+  // ❌ REMOVE THIS (DO NOT USE WITH RADIAL SYSTEM)
+  // positionExpandedChildren(node);
+
   refreshSharedLinks();
-  positionExpandedChildren(node);
   updateGraph();
+
+  // 🔥 Force simulation to recognize new nodes immediately
+  G.sim.alpha(0.9).restart();
+
   analyzePatterns();
   hideLoad();
+
   setStatus(`Expanded ${node.username}: +${added} new nodes`);
 
-  // Update panel button if visible
+  // Update button
   const btn = document.getElementById(`ebtn-${node.id}`);
-  if (btn) { btn.disabled = true; btn.textContent = '✓ EXPANDED'; btn.className = 'p-btn expanded'; }
+  if (btn) {
+    btn.disabled = true;
+    btn.textContent = '✓ EXPANDED';
+    btn.className = 'p-btn expanded';
+  }
 }
 
 // ══════════════════════════════════════════════
