@@ -964,7 +964,7 @@ G.sim = d3.forceSimulation()
   )
   .force('center', d3.forceCenter(W / 2, H / 2).strength(.04))
   .force('collide', d3.forceCollide(d => nodeR(d) + 30).iterations(4))
-  .on('tick', onTick);as
+  .on('tick', onTick);
 
 function nodeR(d) {
   if (!d) return 28;
@@ -1154,7 +1154,7 @@ function updateGraph() {
   const linkForce = G.sim.force('link');
   if (linkForce) linkForce.links(G.links);
 
-  G.sim.alpha(0.15).restart();
+ G.sim.alpha(0.15).restart();
 
   updateStats();
 }
