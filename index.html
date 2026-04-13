@@ -914,254 +914,243 @@ function initGraph() {
 
   G.defs = G.svg.append('defs');
 
-  // Glow
-  const glow = G.defs.append('filter')
-    .attr('id', 'glow')
-    .attr('x', '-50%').attr('y', '-50%')
-    .attr('width', '200%').attr('height', '200%');
-
-  glow.append('feGaussianBlur')
-    .attr('stdDeviation', '4')
-    .attr('result', 'coloredBlur');
-
+  // Glow filter
+  const glow = G.defs.append('filter').attr('id', 'glow').attr('x', '-50%').attr('y', '-50%').attr('width', '200%').attr('height', '200%');
+  glow.append('feGaussianBlur').attr('stdDeviation', '4').attr('result', 'coloredBlur');
   const fm = glow.append('feMerge');
   fm.append('feMergeNode').attr('in', 'coloredBlur');
   fm.append('feMergeNode').attr('in', 'SourceGraphic');
 
-  // Grid
-  const patGrid = G.defs.append('pattern')
-    .attr('id', 'grid')
-    .attr('width', 40)
-    .attr('height', 40)
-    .attr('patternUnits', 'userSpaceOnUse');
+  // Strong glow
+  const glow2 = G.defs.append('filter').attr('id', 'glow2').attr('x', '-80%').attr('y', '-80%').attr('width', '260%').attr('height', '260%');
+  glow2.append('feGaussianBlur').attr('stdDeviation', '8').attr('result', 'coloredBlur');
+  const fm2 = glow2.append('feMerge');
+  fm2.append('feMergeNode').attr('in', 'coloredBlur');
+  fm2.append('feMergeNode').attr('in', 'SourceGraphic');
 
-  patGrid.append('path')
-    .attr('d', 'M 40 0 L 0 0 0 40')
-    .attr('fill', 'none')
-    .attr('stroke', 'rgba(20,34,51,.4)')
-    .attr('stroke-width', 0.5);
+  // Grid background
+  const patGrid = G.defs.append('pattern').attr('id', 'grid').attr('width', 40).attr('height', 40).attr('patternUnits', 'userSpaceOnUse');
+  patGrid.append('path').attr('d', 'M 40 0 L 0 0 0 40').attr('fill', 'none').attr('stroke', 'rgba(20,34,51,.4)').attr('stroke-width', 0.5);
+  G.svg.append('rect').attr('width', '100%').attr('height', '100%').attr('fill', 'url(#grid)');
 
-  G.svg.append('rect')
-    .attr('width', '100%')
-    .attr('height', '100%')
-    .attr('fill', 'url(#grid)');
+  // Zoom
+  G.zoom = d3.zoom().scaleExtent([.06, 5]).on('zoom', e => G.g.attr('transform', e.transform));
+  G.svg.call(G.zoom).on('dblclick.zoom', null);
 
-  // Background click
-  G.svg.on('click', e => {
-    if (e.target.tagName === 'svg' || e.target.tagName === 'rect') {
-      closePanel();
-    }
-  });
+  // Click background to deselect
+  G.svg.on('click', e => { if (e.target.tagName === 'svg' || e.target.tagName === 'rect') closePanel(); });
+  G.svg.on('contextmenu', e => e.preventDefault());
 
-  // Groups
-  G.g = G.svg.append('g');
-  G.linkG = G.g.append('g');
-  G.nodeG = G.g.append('g');
+  // Main group
+  G.g = G.svg.append('g').attr('class', 'main-g');
+  G.linkG = G.g.append('g').attr('class', 'links');
+  G.nodeG = G.g.append('g').attr('class', 'nodes');
 
-  // ── Radial Force
-  function radialForce() {
-    let strength = 0.25;
-
-    function force(alpha) {
-      const grouped = new Map();
-
-      for (const l of G.links) {
-        if (!l.expandedFrom) continue;
-
-        if (!grouped.has(l.expandedFrom)) {
-          grouped.set(l.expandedFrom, []);
-        }
-
-        const childId = srcId(l) === l.expandedFrom ? tgtId(l) : srcId(l);
-        const child = G.nodes.find(n => n.id === childId);
-        if (child) grouped.get(l.expandedFrom).push(child);
-      }
-
-      grouped.forEach((children, parentId) => {
-        const parent = G.nodes.find(n => n.id === parentId);
-        if (!parent) return;
-
-        const radius = 200 + nodeR(parent);
-
-        children.forEach((node, i) => {
-          const angle = (i / children.length) * Math.PI * 2;
-
-          const tx = parent.x + Math.cos(angle) * radius;
-          const ty = parent.y + Math.sin(angle) * radius;
-
-          node.vx += (tx - node.x) * strength * alpha;
-          node.vy += (ty - node.y) * strength * alpha;
-        });
-      });
-    }
-
-    return force;
-  }
-
+  // Simulation
   G.sim = d3.forceSimulation()
-    .force('link', d3.forceLink().id(d => d.id).distance(140).strength(0.6))
-    .force('charge', d3.forceManyBody().strength(-220))
-    .force('center', d3.forceCenter(W / 2, H / 2))
-    .force('collide', d3.forceCollide(d => nodeR(d) + 12))
-    .force('radial', radialForce())
-    .alphaDecay(0.03)
-    .velocityDecay(0.35)
+    .force('link', d3.forceLink().id(d => d.id).distance(d => {
+      const isCenter = srcId(d) === G.centerNode?.id || tgtId(d) === G.centerNode?.id;
+      const baseDistance = isCenter ? 220 : 180;
+      const expandedBonus = d.expandedFrom ? 40 : 0;
+      return baseDistance + expandedBonus + ((nodeR(d.source) + nodeR(d.target)) / 2);
+    }).strength(.72))
+    .force('charge', d3.forceManyBody().strength(-640).distanceMax(700))
+    .force('center', d3.forceCenter(W / 2, H / 2).strength(.04))
+    .force('collide', d3.forceCollide(d => nodeR(d) + 30).iterations(4))
     .on('tick', onTick);
+
+  window.addEventListener('resize', () => {
+    const w2 = wrap.clientWidth, h2 = wrap.clientHeight;
+    G.sim.force('center', d3.forceCenter(w2 / 2, h2 / 2).strength(.04));
+  });
 }
 
-// ══════════════════════════════════════════════
-// NODE SIZE
-// ══════════════════════════════════════════════
 function nodeR(d) {
-  let base = 22;
-  if (d.id === G.centerNode?.id) base = 42;
-  else if (d.level === 1) base = 28;
-
+  if (!d) return 28;
+  
+  // Base size calculation: center node is larger
+  let baseSize = 22;
+  if (d.id === G.centerNode?.id) baseSize = 42;
+  else if (d.level === 1) baseSize = 28;
+  
+  // Scale by follower count using logarithmic scale
+  // This makes the size grow slower as followers increase, preventing extreme size differences
   const followers = d.data?.social?.followers || 0;
-  return base + Math.log10(followers + 1) * 4;
+  const followerBonus = Math.log10(followers + 1) * 4; // Log scale multiplier
+  
+  return baseSize + followerBonus;
 }
 
-// ══════════════════════════════════════════════
-// TICK
-// ══════════════════════════════════════════════
-function onTick() {
-  G.linkSel
-    ?.attr('x1', d => d.source.x)
-    .attr('y1', d => d.source.y)
-    .attr('x2', d => d.target.x)
-    .attr('y2', d => d.target.y);
+function positionExpandedChildren(parent) {
+  if (!parent || parent.x == null || parent.y == null) return;
+  const childLinks = G.links.filter(l => l.expandedFrom === parent.id);
+  if (!childLinks.length) return;
 
-  G.nodeSel
-    ?.attr('transform', d => `translate(${d.x},${d.y})`);
+  const children = childLinks.map(l => {
+    const childId = srcId(l) === parent.id ? tgtId(l) : srcId(l);
+    return G.nodes.find(n => n.id === childId);
+  }).filter(Boolean);
+  if (!children.length) return;
+
+  const radius = 230 + nodeR(parent);
+  const offset = (parent.id % 360) * (Math.PI / 180);
+
+  children.forEach((child, index) => {
+    const angle = offset + (Math.PI * 2 * index / children.length);
+    child.x = parent.x + Math.cos(angle) * radius;
+    child.y = parent.y + Math.sin(angle) * radius;
+  });
+}
+
+function onTick() {
+  if (G.linkSel) G.linkSel
+    .attr('x1', d => d.source.x).attr('y1', d => d.source.y)
+    .attr('x2', d => d.target.x).attr('y2', d => d.target.y);
+  if (G.nodeSel) G.nodeSel.attr('transform', d => `translate(${d.x ?? 0},${d.y ?? 0})`);
 }
 
 // ══════════════════════════════════════════════
 // GRAPH UPDATE
 // ══════════════════════════════════════════════
 function updateGraph() {
-
-  // Clip paths
-  const clips = G.defs.selectAll('clipPath.pfp-clip')
-    .data(G.nodes, d => d.id);
-
-  const clipsEnter = clips.enter()
-    .append('clipPath')
-    .attr('class', 'pfp-clip')
-    .attr('id', d => `clip-${d.id}`);
-
-  clipsEnter.append('circle');
-
-  clips.merge(clipsEnter)
-    .select('circle')
-    .attr('r', d => nodeR(d));
-
-  clips.exit().remove();
-
-  // Links
-  G.linkSel = G.linkG.selectAll('line')
-    .data(G.links, d => d.id)
-    .join('line')
-    .attr('class', d => getLinkClasses(d));
-
-  // Nodes
-  G.nodeSel = G.nodeG.selectAll('g.node')
+  // ── Clip paths
+  G.defs.selectAll('clipPath.nc')
     .data(G.nodes, d => d.id)
     .join(
-      enter => {
-        const ng = enter.append('g')
-          .attr('class', 'node')
-          .style('cursor', 'pointer');
+      en => { const cp = en.append('clipPath').attr('class','nc').attr('id', d => `c-${d.id}`); cp.append('circle').attr('r', d => nodeR(d)); },
+      up => up.select('circle').attr('r', d => nodeR(d)),
+      ex => ex.remove()
+    );
 
-        // Background
-        ng.append('circle').attr('class', 'bg');
+  // ── Links
+  G.linkSel = G.linkG.selectAll('line')
+    .data(G.links, d => d.id)
+    .join(
+      en => en.append('line')
+        .attr('class', d => getLinkClasses(d)),
+      up => up.attr('class', d => getLinkClasses(d)),
+      ex => ex.remove()
+    );
 
-        // Avatar
-        ng.append('image')
-          .attr('class', 'pfp')
-          .attr('clip-path', d => `url(#clip-${d.id})`)
-          .attr('preserveAspectRatio', 'xMidYMid slice')
-          .style('pointer-events', 'none');
+  // ── Nodes
+  const enter = G.nodeG.selectAll('g.node')
+    .data(G.nodes, d => d.id)
+    .join(
+      en => {
+        const ng = en.append('g').attr('class','node').style('cursor','pointer');
 
-        // Border
-        ng.append('circle')
-          .attr('class', 'border')
-          .attr('fill', 'none')
-          .attr('stroke-width', 1.5);
+        // Outer glow ring
+        ng.append('circle').attr('class','ring')
+          .attr('r', d => nodeR(d) + 5)
+          .attr('fill','none')
+          .attr('stroke', d => nodeColor(d))
+          .attr('stroke-width', 1)
+          .attr('opacity', .4)
+          .attr('filter','url(#glow)');
 
-        // DRAG
-        ng.call(
-          d3.drag()
-            .on('start', (ev, d) => {
-              if (!ev.active) G.sim.alphaTarget(0.2).restart();
-              d.fx = d.x;
-              d.fy = d.y;
-            })
-            .on('drag', (ev, d) => {
-              d.fx = ev.x;
-              d.fy = ev.y;
-            })
-            .on('end', (ev, d) => {
-              if (!ev.active) G.sim.alphaTarget(0);
-              if (!d.pinned) {
-                d.fx = null;
-                d.fy = null;
-              }
-            })
-        );
+        // Avatar circle background
+        ng.append('circle').attr('class','bg-circle')
+          .attr('r', d => nodeR(d))
+          .attr('fill','#0b1219');
 
-        // ✅ CLICK RESTORED
-        ng.on('click', (ev, d) => {
-          ev.stopPropagation();
-          selectNode(d);
-        });
+        // Avatar image
+        ng.append('image').attr('class','av-img')
+          .attr('x', d => -nodeR(d))
+          .attr('y', d => -nodeR(d))
+          .attr('width', d => nodeR(d) * 2)
+          .attr('height', d => nodeR(d) * 2)
+          .attr('clip-path', d => `url(#c-${d.id})`)
+          .attr('preserveAspectRatio','xMidYMid slice')
+          .attr('href', d => d.avatarUrl || '');
 
-        // ✅ RIGHT CLICK
-        ng.on('contextmenu', (ev, d) => {
-          ev.preventDefault();
-          ev.stopPropagation();
-          showCtx(ev, d);
-        });
+        // Border ring
+        ng.append('circle').attr('class','border-ring')
+          .attr('r', d => nodeR(d))
+          .attr('fill','none')
+          .attr('stroke', d => nodeColor(d))
+          .attr('stroke-width', d => d.id === G.centerNode?.id ? 2.5 : 1.5)
+          .attr('filter', d => (d.isOnline || d.id === G.centerNode?.id) ? 'url(#glow)' : null);
 
-        // ✅ HOVER
-        ng.on('mouseover', (ev, d) => showTip(ev, d))
-          .on('mousemove', ev => moveTip(ev))
-          .on('mouseout', () => hideTip());
+        // Expanded dot (top-right)
+        ng.append('circle').attr('class','exp-dot')
+          .attr('cx', d => nodeR(d) - 7).attr('cy', d => -(nodeR(d) - 7))
+          .attr('r', 5)
+          .attr('fill', d => d.expanded ? '#3dff5c' : '#142233')
+          .attr('stroke','#060a0e').attr('stroke-width',1.5);
+
+        // Online dot (top-left)
+        ng.append('circle').attr('class','on-dot')
+          .attr('cx', d => -(nodeR(d) - 7)).attr('cy', d => -(nodeR(d) - 7))
+          .attr('r', 4)
+          .attr('fill', d => {
+            if (d.isBanned) return '#ff3f5e';
+            const pt = d.presenceType ?? (d.isOnline ? 1 : 0);
+            if (pt === 2 || pt === 3) return '#b14eff';
+            return pt > 0 ? '#3dff5c' : 'transparent';
+          });
+
+        // Username label
+        ng.append('text').attr('class','node-lbl')
+          .attr('y', d => nodeR(d) + 13)
+          .attr('text-anchor','middle')
+          .attr('font-size', d => d.id === G.centerNode?.id ? '11px' : '9.5px')
+          .attr('fill', d => d.id === G.centerNode?.id ? '#00e8ff' : '#a8c8d8')
+          .text(d => d.username.length > 16 ? d.username.slice(0,15) + '…' : d.username);
+
+        // Interactions
+        ng.on('click', (ev, d) => { ev.stopPropagation(); hideCtx(); selectNode(d); })
+          .on('contextmenu', (ev, d) => { ev.preventDefault(); ev.stopPropagation(); showCtx(ev, d); })
+          .on('mouseenter', (ev, d) => showTip(ev, d))
+          .on('mousemove', moveTip)
+          .on('mouseleave', hideTip)
+          .call(d3.drag()
+            .on('start', (ev, d) => { if (!ev.active) G.sim.alphaTarget(.3).restart(); d.fx = d.x; d.fy = d.y; })
+            .on('drag',  (ev, d) => { d.fx = ev.x; d.fy = ev.y; })
+            .on('end',   (ev, d) => { if (!ev.active) G.sim.alphaTarget(0); if (!d.pinned && d.id !== G.centerNode?.id) { d.fx = null; d.fy = null; } })
+          );
 
         return ng;
       },
-
-      update => update,
-      exit => exit.remove()
+      up => {
+        up.select('.ring').attr('stroke', d => nodeColor(d)).attr('r', d => nodeR(d) + 5);
+        up.select('.bg-circle').attr('r', d => nodeR(d));
+        up.select('.av-img')
+          .attr('x', d => -nodeR(d)).attr('y', d => -nodeR(d))
+          .attr('width', d => nodeR(d) * 2).attr('height', d => nodeR(d) * 2)
+          .attr('href', d => d.avatarUrl || '');
+        up.select('.border-ring')
+          .attr('r', d => nodeR(d))
+          .attr('stroke', d => nodeColor(d))
+          .attr('stroke-width', d => d.id === G.centerNode?.id ? 2.5 : 1.5)
+          .attr('filter', d => (d.isOnline || d.id === G.centerNode?.id) ? 'url(#glow)' : null);
+        up.select('.exp-dot')
+          .attr('cx', d => nodeR(d) - 7).attr('cy', d => -(nodeR(d) - 7))
+          .attr('fill', d => d.expanded ? '#3dff5c' : '#142233');
+        up.select('.on-dot')
+          .attr('cx', d => -(nodeR(d) - 7)).attr('cy', d => -(nodeR(d) - 7))
+          .attr('fill', d => {
+            if (d.isBanned) return '#ff3f5e';
+            const pt = d.presenceType ?? (d.isOnline ? 1 : 0);
+            if (pt === 2 || pt === 3) return '#b14eff';
+            return pt > 0 ? '#3dff5c' : 'transparent';
+          });
+        up.select('.node-lbl')
+          .attr('y', d => nodeR(d) + 13)
+          .attr('font-size', d => d.id === G.centerNode?.id ? '11px' : '9.5px')
+          .attr('fill', d => d.id === G.centerNode?.id ? '#00e8ff' : '#a8c8d8');
+        return up;
+      },
+      ex => ex.remove()
     );
 
-  // Apply visuals
-  G.nodeSel.each(function(d) {
-    const r = nodeR(d);
-    const sel = d3.select(this);
+  G.nodeSel = G.nodeG.selectAll('g.node');
 
-    sel.select('.bg')
-      .attr('r', r)
-      .attr('fill', '#0b1219');
-
-    sel.select('.pfp')
-      .attr('x', -r)
-      .attr('y', -r)
-      .attr('width', r * 2)
-      .attr('height', r * 2)
-      .attr('href', d.avatarUrl || '');
-
-    sel.select('.border')
-      .attr('r', r)
-      .attr('stroke', nodeColor(d));
-  });
-
-  // Simulation update
   G.sim.nodes(G.nodes);
   G.sim.force('link').links(G.links);
+  G.sim.alpha(.35).restart();
 
-  G.sim.alpha(0.6).restart();
+  updateStats();
 }
-  
 
 // ══════════════════════════════════════════════
 // SEARCH
@@ -1301,19 +1290,13 @@ async function searchUser() {
 }
 
 // ══════════════════════════════════════════════
-// EXPAND NODE (FIXED FOR RADIAL SYSTEM)
-// ══════════════════════════════════════════════
+// EXPAND NODE
 async function expandNode(nodeId) {
   const node = G.nodes.find(n => n.id === +nodeId);
   if (!node) return;
-
-  if (node.expanded) {
-    setStatus(`${node.username} already expanded`);
-    return;
-  }
+  if (node.expanded) { setStatus(`${node.username} already expanded`); return; }
 
   node.expanded = true;
-
   showLoad(`EXPANDING ${node.username.toUpperCase()} — fetching friends and groups`, 'blocking');
   setStatus('Expanding: ' + node.username);
 
@@ -1322,25 +1305,19 @@ async function expandNode(nodeId) {
     API.getGroups(node.id),
   ]);
 
-  // ── Load groups if needed
+  // Update node groups if not loaded
   if (!node.groups.length && groups.length) {
     const gids = groups.map(g => g.group?.id).filter(Boolean);
     const icons = gids.length ? await API.getGroupIcons(gids) : {};
-
     node.data = node.data || {};
     node.data.groups = groups.map(g => ({ ...g, _icon: icons[g.group?.id] || null }));
-    node.groups = node.data.groups.map(g => ({
-      id: g.group?.id,
-      name: g.group?.name,
-      icon: g._icon
-    }));
+    node.groups = node.data.groups.map(g => ({ id: g.group?.id, name: g.group?.name, icon: g._icon }));
   }
 
-  const existingIds = new Set(G.nodes.map(n => n.id));
-  const newIds = friends.map(f => +f.id).filter(id => !existingIds.has(id));
+  const newFriends = friends.filter(f => !G.nodes.find(n => n.id === +f.id));
+  const newIds = newFriends.map(f => +f.id);
 
   showLoad('LOADING expanded friend avatars, follower counts, and presence', 'blocking');
-
   const [avatarMap, followerMap, presences] = await Promise.all([
     newIds.length ? API.getAvatarUrls(newIds) : Promise.resolve({}),
     newIds.length ? API.getFollowerCounts(newIds) : Promise.resolve({}),
@@ -1351,14 +1328,10 @@ async function expandNode(nodeId) {
   for (const p of presences) presMap[+p.userId] = p;
 
   let added = 0;
-
   for (const f of friends) {
     const fid = +f.id;
-
-    // ── Add node if new
-    if (!existingIds.has(fid)) {
+    if (!G.nodes.find(n => n.id === fid)) {
       const ptype = presMap[fid]?.userPresenceType || 0;
-
       G.nodes.push({
         id: fid,
         username: f.name,
@@ -1367,62 +1340,30 @@ async function expandNode(nodeId) {
         isOnline: f.isOnline || ptype > 0,
         isBanned: fid === -1,
         presenceType: ptype,
-        expanded: false,
-        pinned: false,
-        level: (node.level || 1) + 1,
+        expanded: false, pinned: false, level: (node.level || 1) + 1,
         sourceId: node.id,
         groups: [],
-        data: {
-          presence: presMap[fid],
-          social: { followers: followerMap[fid] || 0 }
-        },
+        data: { presence: presMap[fid], social: { followers: followerMap[fid] || 0 } },
         dataLoaded: false,
-
-        // 🔥 IMPORTANT: spawn near parent (prevents jump-in from corner)
-        x: node.x + (Math.random() - 0.5) * 50,
-        y: node.y + (Math.random() - 0.5) * 50
       });
-
       added++;
     }
-
-    // ── Add link
     const lid = linkId(node.id, fid);
     if (!G.links.find(l => l.id === lid)) {
-      G.links.push({
-        id: lid,
-        source: node.id,
-        target: fid,
-
-        // 🔥 REQUIRED FOR CIRCLE
-        expandedFrom: node.id,
-
-        sharedGroups: []
-      });
+      G.links.push({ id: lid, source: node.id, target: fid, sharedGroups: [], expandedFrom: node.id });
     }
   }
 
-  // ❌ REMOVE THIS (DO NOT USE WITH RADIAL SYSTEM)
-  // positionExpandedChildren(node);
-
   refreshSharedLinks();
+  positionExpandedChildren(node);
   updateGraph();
-
-  // 🔥 Force simulation to recognize new nodes immediately
-  G.sim.alpha(0.9).restart();
-
   analyzePatterns();
   hideLoad();
-
   setStatus(`Expanded ${node.username}: +${added} new nodes`);
 
-  // Update button
+  // Update panel button if visible
   const btn = document.getElementById(`ebtn-${node.id}`);
-  if (btn) {
-    btn.disabled = true;
-    btn.textContent = '✓ EXPANDED';
-    btn.className = 'p-btn expanded';
-  }
+  if (btn) { btn.disabled = true; btn.textContent = '✓ EXPANDED'; btn.className = 'p-btn expanded'; }
 }
 
 // ══════════════════════════════════════════════
