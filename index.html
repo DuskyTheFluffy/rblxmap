@@ -1739,59 +1739,115 @@ function analyzePatterns() {
     });
   }
 
-  // Mutual connection highlights
-  const mutualCounts = G.nodes
-    .filter(n => n.id !== G.centerNode?.id)
-    .map(n => {
-      const mutuals = G.nodes.filter(m => m.id !== n.id && m.id !== G.centerNode?.id &&
-        G.links.some(l => (srcId(l) === n.id && tgtId(l) === m.id) || (srcId(l) === m.id && tgtId(l) === n.id)) &&
-        G.links.some(l => (srcId(l) === G.centerNode?.id && tgtId(l) === m.id) || (srcId(l) === m.id && tgtId(l) === G.centerNode?.id)));
-      return { node: n, count: mutuals.length, mutuals };
-    })
-    .filter(x => x.count > 1)
-    .sort((a,b) => b.count - a.count)
-    .slice(0, 3);
+  // Mutual connection highlights (FIXED: full shared-mutual detection + multi-highlight ready)
 
-  for (const item of mutualCounts) {
-    const names = item.mutuals.slice(0, 4).map(m => m.username).join(', ');
-    patterns.push({
-      icon: '⤷', title: `Mutuals: ${item.node.username}`,
-      detail: `Shares ${item.count} mutual connections with ${G.centerNode?.username}: ${names}${item.count > 4 ? ', ...' : ''}`
+const mutualCounts = G.nodes
+  .filter(n => n.id !== G.centerNode?.id)
+  .map(n => {
+    const mutuals = G.nodes.filter(m => {
+      if (!G.centerNode?.id) return false;
+      if (m.id === n.id || m.id === G.centerNode.id) return false;
+
+      // n <-> m connection
+      const nToM = G.links.some(l =>
+        (srcId(l) === n.id && tgtId(l) === m.id) ||
+        (srcId(l) === m.id && tgtId(l) === n.id)
+      );
+
+      // center <-> m connection
+      const centerToM = G.links.some(l =>
+        (srcId(l) === G.centerNode.id && tgtId(l) === m.id) ||
+        (srcId(l) === m.id && tgtId(l) === G.centerNode.id)
+      );
+
+      return nToM && centerToM;
     });
-  }
 
-  const popular = G.nodes
-    .filter(n => n.id !== G.centerNode?.id && (n.data?.social?.followers || 0) > 0)
-    .sort((a,b) => (b.data?.social?.followers || 0) - (a.data?.social?.followers || 0))
-    .slice(0, 2);
-  for (const n of popular) {
-    patterns.push({
-      icon: '★', title: `Strong profile: ${n.username}`,
-      detail: `${fmtNum(n.data?.social?.followers || 0)} followers — larger node on graph`
-    });
-  }
+    return { node: n, count: mutuals.length, mutuals };
+  })
+  .filter(x => x.count > 0) // FIX: include single-mutual relationships
+  .sort((a, b) => b.count - a.count)
+  .slice(0, 3);
 
-  // Network depth
-  if (G.nodes.length > 20) {
-    const levels = [...new Set(G.nodes.map(n => n.level || 0))].sort((a,b) => a-b);
-    patterns.push({
-      icon: '↕', title: `Network Depth: ${levels.length} levels`,
-      detail: `${G.nodes.filter(n => n.level === 0).length} core · ${G.nodes.filter(n => n.level === 1).length} direct · ${G.nodes.filter(n => (n.level||0) > 1).length} extended`
-    });
-  }
 
-  // Render
-  const el = document.getElementById('pattern-list');
-  if (!patterns.length) {
-    el.innerHTML = '<div class="pat-item" style="color:var(--text3)">No patterns yet. Expand more nodes to reveal connections.</div>';
-    return;
+// Build highlight edge set (for yellow lines)
+const highlightEdges = new Set();
+
+for (const item of mutualCounts) {
+  const n = item.node;
+
+  for (const m of item.mutuals) {
+    // center ↔ mutual
+    highlightEdges.add(`${G.centerNode.id}-${m.id}`);
+    highlightEdges.add(`${m.id}-${G.centerNode.id}`);
+
+    // node ↔ mutual
+    highlightEdges.add(`${n.id}-${m.id}`);
+    highlightEdges.add(`${m.id}-${n.id}`);
+
+    // OPTIONAL (uncomment if you also want direct triangle emphasis)
+    // highlightEdges.add(`${G.centerNode.id}-${n.id}`);
+    // highlightEdges.add(`${n.id}-${G.centerNode.id}`);
   }
-  el.innerHTML = patterns.map(p => `
+}
+
+
+// Pattern display
+for (const item of mutualCounts) {
+  const names = item.mutuals.slice(0, 4).map(m => m.username).join(', ');
+
+  patterns.push({
+    icon: '⤷',
+    title: `Mutuals: ${item.node.username}`,
+    detail: `Shares ${item.count} mutual connections with ${G.centerNode?.username}: ${names}${item.count > 4 ? ', ...' : ''}`
+  });
+}
+
+
+// Popular nodes
+const popular = G.nodes
+  .filter(n => n.id !== G.centerNode?.id && (n.data?.social?.followers || 0) > 0)
+  .sort((a, b) => (b.data?.social?.followers || 0) - (a.data?.social?.followers || 0))
+  .slice(0, 2);
+
+for (const n of popular) {
+  patterns.push({
+    icon: '★',
+    title: `Strong profile: ${n.username}`,
+    detail: `${fmtNum(n.data?.social?.followers || 0)} followers — larger node on graph`
+  });
+}
+
+
+// Network depth
+if (G.nodes.length > 20) {
+  const levels = [...new Set(G.nodes.map(n => n.level || 0))].sort((a, b) => a - b);
+
+  patterns.push({
+    icon: '↕',
+    title: `Network Depth: ${levels.length} levels`,
+    detail: `${G.nodes.filter(n => n.level === 0).length} core · ${G.nodes.filter(n => n.level === 1).length} direct · ${G.nodes.filter(n => (n.level || 0) > 1).length} extended`
+  });
+}
+
+
+// Render
+const el = document.getElementById('pattern-list');
+
+if (!patterns.length) {
+  el.innerHTML =
+    '<div class="pat-item" style="color:var(--text3)">No patterns yet. Expand more nodes to reveal connections.</div>';
+  return;
+}
+
+el.innerHTML = patterns
+  .map(p => `
     <div class="pat-item">
       <div class="pat-item-title">${p.icon} ${p.title}</div>
       <div class="pat-item-detail">${p.detail}</div>
-    </div>`).join('');
-}
+    </div>
+  `)
+  .join('');
 
 // ══════════════════════════════════════════════
 // TOOLTIP
