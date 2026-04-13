@@ -1012,10 +1012,6 @@ function onTick() {
 // ══════════════════════════════════════════════
 // GRAPH UPDATE
 // ══════════════════════════════════════════════
-G.sim
-  .velocityDecay(0.5)   // smoother movement
-  .alphaDecay(0.1);     // faster stabilization
-  
 function updateGraph() {
   // ── Clip paths
   G.defs.selectAll('clipPath.nc')
@@ -1205,6 +1201,10 @@ function updateGraph() {
 
   updateStats();
 }
+G.sim
+  .velocityDecay(0.5)   // smoother movement
+  .alphaDecay(0.1);     // faster stabilization
+  
 
 // ══════════════════════════════════════════════
 // SEARCH
