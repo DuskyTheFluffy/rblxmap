@@ -10,7 +10,7 @@ style-src 'self' 'unsafe-inline';
 ">
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>RBLX // NETWORK INTEL</title>
+<title>Roblox Social Network</title>
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Rajdhani:wght@300;400;600;700&display=swap');
 
@@ -1213,7 +1213,7 @@ async function searchUser() {
     displayName: info?.displayName || '',
     avatarUrl,
     isOnline: (presMap[uid]?.userPresenceType || 0) > 0,
-    isBanned: info?.isBanned || false,
+    isBanned: f.isBanned || fid === -1,
     presenceType: presMap[uid]?.userPresenceType || 0,
     expanded: true, pinned: true, level: 0,
     groups: [],
@@ -1233,7 +1233,7 @@ async function searchUser() {
       displayName: f.displayName || '',
       avatarUrl: avatarMap[fid] || null,
       isOnline: f.isOnline || ptype > 0,
-      isBanned: false,
+      isBanned: f.isBanned || fid === -1,
       presenceType: ptype,
       expanded: false, pinned: false, level: 1,
       sourceId: uid,
@@ -1338,7 +1338,7 @@ async function expandNode(nodeId) {
         displayName: f.displayName || '',
         avatarUrl: avatarMap[fid] || null,
         isOnline: f.isOnline || ptype > 0,
-        isBanned: false,
+        isBanned: f.isBanned || fid === -1,
         presenceType: ptype,
         expanded: false, pinned: false, level: (node.level || 1) + 1,
         sourceId: node.id,
