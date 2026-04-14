@@ -948,20 +948,22 @@ function initGraph() {
   G.nodeG = G.g.append('g').attr('class', 'nodes');
 
   // Simulation
-    G.sim = d3.forceSimulation()
+  G.sim = d3.forceSimulation()
     .force('link', d3.forceLink().id(d => d.id).distance(d => {
       const isCenter = srcId(d) === G.centerNode?.id || tgtId(d) === G.centerNode?.id;
       const baseDistance = isCenter ? 220 : 180;
       const expandedBonus = d.expandedFrom ? 40 : 0;
       return baseDistance + expandedBonus + ((nodeR(d.source) + nodeR(d.target)) / 2);
-    }).strength(.55))
-    .force('charge', d3.forceManyBody().strength(-480).distanceMax(700))
-    // Removed center force - conflicts with charge and causes oscillation
-    .force('collide', d3.forceCollide(d => nodeR(d) + 25).iterations(2).radiusPadding(1.2))
+    }).strength(.72))
+    .force('charge', d3.forceManyBody().strength(-640).distanceMax(700))
+    .force('center', d3.forceCenter(W / 2, H / 2).strength(.04))
+    .force('collide', d3.forceCollide(d => nodeR(d) + 30).iterations(4))
     .on('tick', onTick);
 
-    // Removed resize listener - center force was causing issues
-  // Window resize is handled by D3's SVG auto-sizing
+  window.addEventListener('resize', () => {
+    const w2 = wrap.clientWidth, h2 = wrap.clientHeight;
+    G.sim.force('center', d3.forceCenter(w2 / 2, h2 / 2).strength(.04));
+  });
 }
 
 function nodeR(d) {
@@ -1002,15 +1004,6 @@ function positionExpandedChildren(parent) {
 }
 
 function onTick() {
-  // Apply velocity damping to reduce perpetual movement
-  const damping = 0.985; // Lower = more friction, higher = smoother but longer settling
-  G.nodes.forEach(node => {
-    if (node.vx) node.x += node.vx;
-    if (node.vy) node.y += node.vy;
-    node.vx *= damping;
-    node.vy *= damping;
-  });
-
   if (G.linkSel) G.linkSel
     .attr('x1', d => d.source.x).attr('y1', d => d.source.y)
     .attr('x2', d => d.target.x).attr('y2', d => d.target.y);
@@ -1021,9 +1014,6 @@ function onTick() {
 // GRAPH UPDATE
 // ══════════════════════════════════════════════
 function updateGraph() {
-  // ── Reset velocities for fresh simulation
-  G.nodes.forEach(node => { node.vx = 0; node.vy = 0; });
-
   // ── Clip paths
   G.defs.selectAll('clipPath.nc')
     .data(G.nodes, d => d.id)
@@ -1108,14 +1098,14 @@ function updateGraph() {
           .attr('fill', d => d.id === G.centerNode?.id ? '#00e8ff' : '#a8c8d8')
           .text(d => d.username.length > 16 ? d.username.slice(0,15) + '…' : d.username);
 
-                // Interactions
+        // Interactions
         ng.on('click', (ev, d) => { ev.stopPropagation(); hideCtx(); selectNode(d); })
           .on('contextmenu', (ev, d) => { ev.preventDefault(); ev.stopPropagation(); showCtx(ev, d); })
           .on('mouseenter', (ev, d) => showTip(ev, d))
           .on('mousemove', moveTip)
           .on('mouseleave', hideTip)
           .call(d3.drag()
-            .on('start', (ev, d) => { if (!ev.active) G.sim.alphaTarget(.15).restart(); d.fx = d.x; d.fy = d.y; })
+            .on('start', (ev, d) => { if (!ev.active) G.sim.alphaTarget(.3).restart(); d.fx = d.x; d.fy = d.y; })
             .on('drag',  (ev, d) => { d.fx = ev.x; d.fy = ev.y; })
             .on('end',   (ev, d) => { if (!ev.active) G.sim.alphaTarget(0); if (!d.pinned && d.id !== G.centerNode?.id) { d.fx = null; d.fy = null; } })
           );
