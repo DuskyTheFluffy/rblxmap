@@ -448,6 +448,7 @@ body::after {
 .link-expanded { stroke: rgba(0,232,255,.36); stroke-width: 2.5; }
 .link-path { stroke: rgba(255,255,255,.25); stroke-width: 2.2; }
 .link-mutual { stroke: rgba(255,193,7,.9); stroke-width: 3; }
+.link-mutual-friend { fill: none; stroke: rgba(255,193,7,.65); stroke-width: 1.8; stroke-dasharray: 4,3; }
 
 text.node-lbl {
   font-family: 'Share Tech Mono', monospace;
@@ -1635,8 +1636,71 @@ async function setCenterNode(id) {
 }
 
 // ══════════════════════════════════════════════
-// SHARED GROUP LINKS
+// SHARED GROUP LINKS & MUTUAL FRIEND DETECTION
 // ══════════════════════════════════════════════
+function findMutualFriendPairs() {
+  // Find all pairs of nodes that share at least one mutual friend (common neighbor)
+  const processedPairs = new Set();
+  
+  for (const nodeA of G.nodes) {
+    if (!nodeA.id) continue;
+    
+    // Get neighbors of nodeA (all nodes directly connected to nodeA)
+    const neighborsA = new Set(
+      G.links.filter(l => srcId(l) === nodeA.id || tgtId(l) === nodeA.id)
+        .map(l => srcId(l) === nodeA.id ? tgtId(l) : srcId(l))
+    );
+    
+    for (const neighborB of neighborsA) {
+      if (!neighborB) continue;
+      
+      // Skip if we've already processed this pair
+      const pairKey = `${Math.min(nodeA.id, neighborB)}-${Math.max(nodeA.id, neighborB)}`;
+      if (processedPairs.has(pairKey)) continue;
+      
+      // Get neighbors of nodeB
+      const neighborsB = new Set(
+        G.links.filter(l => srcId(l) === neighborB || tgtId(l) === neighborB)
+          .map(l => srcId(l) === neighborB ? tgtId(l) : srcId(l))
+      );
+      
+      // Find common neighbors (mutual friends between nodeA and neighborB)
+      const mutuals = [...neighborsA].filter(n => neighborsB.has(n));
+      
+      if (mutuals.length > 0) {
+        processedPairs.add(pairKey);
+        
+        // Find the existing link or create one
+        let link = G.links.find(l => l.id === pairKey);
+        if (!link) {
+          link = { id: pairKey, source: Math.min(nodeA.id, neighborB), target: Math.max(nodeA.id, neighborB), 
+                   sharedGroups: [], isMutualFriendPair: true, mutualFriends: mutuals };
+          G.links.push(link);
+        } else {
+          if (!link.isMutualFriendPair) {
+            link.isMutualFriendPair = true;
+            // Merge mutual friends
+            const existingMutuals = link.mutualFriends || [];
+            for (const m of mutuals) {
+              if (!existingMutuals.includes(m)) existingMutuals.push(m);
+            }
+            link.mutualFriends = existingMutuals;
+          } else {
+            // Merge with existing
+            const existingMutuals = link.mutualFriends || [];
+            for (const m of mutuals) {
+              if (!existingMutuals.includes(m)) existingMutuals.push(m);
+            }
+            link.mutualFriends = existingMutuals;
+          }
+        }
+      }
+    }
+  }
+  
+  return processedPairs.size;
+}
+
 function refreshSharedLinks() {
   const groupNodes = {};
   for (const node of G.nodes) {
@@ -1674,6 +1738,9 @@ function refreshSharedLinks() {
     }
   }
 
+  // Find and mark all mutual friend pairs with yellow lines
+  findMutualFriendPairs();
+
   if (G.linkSel) G.linkSel.attr('class', d => getLinkClasses(d));
 }
 
@@ -1682,6 +1749,12 @@ function getLinkClasses(d) {
   if (d.isExpandedPath) classes.push('link-expanded');
   else classes.push(d.sharedGroups?.length ? 'link-shared' : 'link-line');
   if (d.isMutual) classes.push('link-mutual');
+  // Yellow line for mutual friend pairs
+  if (d.isMutualFriendPair) {
+    classes.push('link-mutual-friend');
+    // Add extra styling to make yellow lines more visible
+    d.mutualFriendStyle = 'stroke: rgba(255,193,7,.85); stroke-width: 2.5;';
+  }
   return classes.join(' ');
 }
 
