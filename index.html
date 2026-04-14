@@ -1781,105 +1781,300 @@ function getLinkClasses(d) {
 function analyzePatterns() {
   const patterns = [];
 
-  // Shared groups
+  const _srcId = l => +(typeof l.source === 'object' ? l.source.id : l.source);
+  const _tgtId = l => +(typeof l.target === 'object' ? l.target.id : l.target);
+
+  function formatUsernames(nodeList, max = 4) {
+    if (!nodeList || !nodeList.length) return 'None';
+    const names = [];
+    for (const n of nodeList) {
+      const name = n?.username ?? n?.name ?? n?.displayName ?? null;
+      if (name && typeof name === 'string' && name.trim()) names.push(name.trim());
+    }
+    if (!names.length) return 'None';
+    const shown = names.slice(0, max).join(', ');
+    return names.length > max ? `${shown} (+${names.length - max} more)` : shown;
+  }
+
+  function fmt(n) {
+    if (n >= 1_000_000) return (n / 1_000_000).toFixed(1) + 'M';
+    if (n >= 1_000) return (n / 1_000).toFixed(1) + 'K';
+    return String(n);
+  }
+
+  const center = G.centerNode;
+  const nodes  = G.nodes  || [];
+  const links  = G.links  || [];
+
+  // O(1) edge lookups — all IDs coerced to strings for consistency
+  const edgeSet = new Set(
+    links.flatMap(l => {
+      const s = String(_srcId(l)), t = String(_tgtId(l));
+      return [`${s}|${t}`, `${t}|${s}`];
+    })
+  );
+  const linked = (a, b) => edgeSet.has(`${String(a)}|${String(b)}`);
+
+  // Degree map — string keys to avoid number/object mismatch after D3 mutation
+  const degree = {};
+  for (const l of links) {
+    const s = String(_srcId(l)), t = String(_tgtId(l));
+    degree[s] = (degree[s] || 0) + 1;
+    degree[t] = (degree[t] || 0) + 1;
+  }
+  const deg = n => degree[String(n.id)] || 0;
+
+  // ── 1. SHARED GROUPS ─────────────────────────────────────────────────────────
+
   const groupData = {};
-  for (const n of G.nodes) {
+  for (const n of nodes) {
     for (const g of (n.groups || [])) {
-      if (!g.id) continue;
-      if (!groupData[g.id]) groupData[g.id] = { name: g.name, nodes: [] };
+      if (!g?.id) continue;
+      if (!groupData[g.id]) groupData[g.id] = { name: g.name || String(g.id), nodes: [], hasCenter: false };
       groupData[g.id].nodes.push(n);
+      if (n.id === center?.id) groupData[g.id].hasCenter = true;
     }
   }
-  for (const [gid, group] of Object.entries(groupData).sort(([, a],[, b]) => b.nodes.length - a.nodes.length).slice(0, 6)) {
-    if (group.nodes.length >= 2) {
-      const names = group.nodes.map(n => n.username).slice(0, 4).join(', ');
+
+  const topGroups = Object.values(groupData)
+    .filter(g => g.hasCenter && g.nodes.length >= 2)
+    .sort((a, b) => b.nodes.length - a.nodes.length)
+    .slice(0, 6);
+
+  for (const group of topGroups) {
+    const others = group.nodes.filter(n => n.id !== center?.id);
+    patterns.push({
+      icon: '◈',
+      title: `Shared Group: ${group.name}`,
+      detail: [
+        `${group.nodes.length} members including the center node`,
+        `Other members: ${formatUsernames(others)}`,
+        `Shared group membership indicates a direct community link.`,
+      ]
+    });
+  }
+
+  // ── 2. PRESENCE CLUSTERS ─────────────────────────────────────────────────────
+
+  const online   = nodes.filter(n => n.isOnline || n.presenceType > 0);
+  const inGame   = nodes.filter(n => n.presenceType === 2);
+  const inStudio = nodes.filter(n => n.presenceType === 3);
+
+  if (online.length >= 2) {
+    patterns.push({
+      icon: '●',
+      title: `${online.length} Players Currently Online`,
+      detail: [
+        `Players: ${formatUsernames(online, 6)}`,
+        inGame.length   ? `▶ In-Game: ${formatUsernames(inGame, 4)}`   : null,
+        inStudio.length ? `⬡ In Studio: ${formatUsernames(inStudio, 4)}` : null,
+        `Click an online node to see their current activity.`,
+      ]
+    });
+  }
+
+  // ── 3. SOCIAL HUBS ───────────────────────────────────────────────────────────
+
+  const hubThreshold = Math.max(3, Math.ceil(nodes.length * 0.1));
+  const hubs = nodes
+    .filter(n => n.id !== center?.id && deg(n) >= hubThreshold)
+    .sort((a, b) => deg(b) - deg(a))
+    .slice(0, 4);
+
+  for (const hub of hubs) {
+    const cnt = deg(hub);
+    patterns.push({
+      icon: '⬡',
+      title: `Social Hub: ${hub.username || hub.name || 'Unknown'}`,
+      detail: [
+        `Connected to ${cnt} mapped players (${((cnt / nodes.length) * 100).toFixed(0)}% of network)`,
+        `Acts as a bridge between otherwise disconnected clusters.`,
+        `May be a community leader, clan admin, or well-known player.`,
+      ]
+    });
+  }
+
+  // ── 4. MUTUAL CONNECTIONS ────────────────────────────────────────────────────
+
+  if (center) {
+    const centerNeighbors = new Set(
+      nodes.filter(n => linked(center.id, n.id)).map(n => String(n.id))
+    );
+
+    const mutuals = nodes
+      .filter(n => n.id !== center.id && !centerNeighbors.has(String(n.id)))
+      .map(n => {
+        const shared = nodes.filter(m =>
+          m.id !== n.id &&
+          m.id !== center.id &&
+          centerNeighbors.has(String(m.id)) &&
+          linked(n.id, m.id)
+        );
+        return { node: n, shared };
+      })
+      .filter(x => x.shared.length > 1)
+      .sort((a, b) => b.shared.length - a.shared.length)
+      .slice(0, 5);
+
+    for (const { node, shared } of mutuals) {
       patterns.push({
-        icon: '◈', title: `Shared Group: ${group.name || gid}`,
-        detail: `${group.nodes.length} mapped players share this group: ${names}${group.nodes.length > 4 ? ', ...' : ''}`
+        icon: '⤷',
+        title: `Mutual Connections: ${node.username || node.name || 'Unknown'}`,
+        detail: [
+          `Shares ${shared.length} mutual friends with the center node`,
+          `Mutuals: ${formatUsernames(shared)}`,
+          `Overlapping social circles — likely knows the center user indirectly.`,
+        ]
       });
     }
   }
 
-  // Online cluster
-  const online = G.nodes.filter(n => n.isOnline || n.presenceType > 0);
-  if (online.length >= 3) patterns.push({
-    icon: '●', title: `${online.length} Players Online`,
-    detail: online.slice(0,5).map(n => n.username).join(', ') + (online.length > 5 ? '...' : '')
-  });
+  // ── 5. INFLUENTIAL PROFILES ──────────────────────────────────────────────────
 
-  // In-game cluster
-  const ingame = G.nodes.filter(n => n.presenceType === 2);
-  if (ingame.length >= 2) patterns.push({
-    icon: '▶', title: `${ingame.length} Players In-Game`,
-    detail: ingame.slice(0,4).map(n => n.username).join(', ')
-  });
+  const popular = nodes
+    .filter(n => n.id !== center?.id && (n.data?.social?.followers || 0) > 100)
+    .sort((a, b) => (b.data?.social?.followers || 0) - (a.data?.social?.followers || 0))
+    .slice(0, 5);
 
-  // Hub nodes
-  const conns = {};
-  for (const l of G.links) {
-    const s = srcId(l), t = tgtId(l);
-    conns[s] = (conns[s] || 0) + 1;
-    conns[t] = (conns[t] || 0) + 1;
-  }
-  for (const [id, cnt] of Object.entries(conns).sort((a,b) => b[1]-a[1]).slice(0, 3)) {
-    const n = G.nodes.find(x => x.id === +id);
-    if (n && n.id !== G.centerNode?.id && cnt >= 3) patterns.push({
-      icon: '⬡', title: `Hub: ${n.username}`,
-      detail: `Connected to ${cnt} mapped players — social bridge`
-    });
-  }
-
-  // Mutual connection highlights
-  const mutualCounts = G.nodes
-    .filter(n => n.id !== G.centerNode?.id)
-    .map(n => {
-      const mutuals = G.nodes.filter(m => m.id !== n.id && m.id !== G.centerNode?.id &&
-        G.links.some(l => (srcId(l) === n.id && tgtId(l) === m.id) || (srcId(l) === m.id && tgtId(l) === n.id)) &&
-        G.links.some(l => (srcId(l) === G.centerNode?.id && tgtId(l) === m.id) || (srcId(l) === m.id && tgtId(l) === G.centerNode?.id)));
-      return { node: n, count: mutuals.length, mutuals };
-    })
-    .filter(x => x.count > 1)
-    .sort((a,b) => b.count - a.count)
-    .slice(0, 3);
-
-  for (const item of mutualCounts) {
-    const names = item.mutuals.slice(0, 4).map(m => m.username).join(', ');
+  if (popular.length > 0) {
     patterns.push({
-      icon: '⤷', title: `Mutuals: ${item.node.username}`,
-      detail: `Shares ${item.count} mutual connections with ${G.centerNode?.username}: ${names}${item.count > 4 ? ', ...' : ''}`
+      icon: '★',
+      title: `Top Profiles by Followers`,
+      detail: [
+        ...popular.map(p => `${p.username || p.name || 'Unknown'}: ${fmt(p.data?.social?.followers || 0)} followers`),
+        `Larger nodes in the graph indicate these influential users.`,
+      ]
     });
   }
 
-  const popular = G.nodes
-    .filter(n => n.id !== G.centerNode?.id && (n.data?.social?.followers || 0) > 0)
-    .sort((a,b) => (b.data?.social?.followers || 0) - (a.data?.social?.followers || 0))
-    .slice(0, 2);
-  for (const n of popular) {
+  // ── 6. ISOLATED NODES ────────────────────────────────────────────────────────
+
+  const isolated = nodes.filter(n => n.id !== center?.id && deg(n) === 0);
+  if (isolated.length > 0) {
     patterns.push({
-      icon: '★', title: `Strong profile: ${n.username}`,
-      detail: `${fmtNum(n.data?.social?.followers || 0)} followers — larger node on graph`
+      icon: '○',
+      title: `${isolated.length} Isolated Node${isolated.length > 1 ? 's' : ''}`,
+      detail: [
+        `Players: ${formatUsernames(isolated, 6)}`,
+        `These nodes have no detected connections to others in the graph.`,
+        `Try expanding them to discover hidden links.`,
+      ]
     });
   }
 
-  // Network depth
-  if (G.nodes.length > 20) {
-    const levels = [...new Set(G.nodes.map(n => n.level || 0))].sort((a,b) => a-b);
+  // ── 7. NETWORK STRUCTURE ─────────────────────────────────────────────────────
+
+  if (nodes.length > 10) {
+    const byLevel = l => nodes.filter(n => (n.level || 0) === l).length;
     patterns.push({
-      icon: '↕', title: `Network Depth: ${levels.length} levels`,
-      detail: `${G.nodes.filter(n => n.level === 0).length} core · ${G.nodes.filter(n => n.level === 1).length} direct · ${G.nodes.filter(n => (n.level||0) > 1).length} extended`
+      icon: '↕',
+      title: `Network Structure`,
+      detail: [
+        `${nodes.length} total nodes mapped`,
+        `Level 0 (Core): ${byLevel(0)} — center node`,
+        `Level 1 (Direct): ${byLevel(1)} — direct friends`,
+        `Level 2+ (Extended): ${nodes.filter(n => (n.level || 0) > 1).length} — friends of friends`,
+        `${links.length} total connections mapped`,
+      ]
     });
   }
 
-  // Render
+  // ── 8. CONNECTION DENSITY ────────────────────────────────────────────────────
+
+  if (nodes.length > 5 && links.length > 0) {
+    const maxLinks = (nodes.length * (nodes.length - 1)) / 2;
+    const density  = (links.length / maxLinks) * 100;
+    const tier     = density > 20 ? 'Tightly knit community' : density > 5 ? 'Moderately connected' : 'Loosely connected — many acquaintances';
+    patterns.push({
+      icon: '⊙',
+      title: `Connection Density: ${density.toFixed(1)}%`,
+      detail: [
+        `${links.length} actual links of ${maxLinks.toLocaleString()} possible`,
+        `Assessment: ${tier}`,
+      ]
+    });
+  }
+
+  // ── 9. CLIQUES (TRIANGLES) ───────────────────────────────────────────────────
+
+  const nonCenter = nodes.filter(n => n.id !== center?.id);
+  const triangles = [];
+  for (let i = 0; i < nonCenter.length; i++) {
+    for (let j = i + 1; j < nonCenter.length; j++) {
+      const a = nonCenter[i], b = nonCenter[j];
+      if (!linked(a.id, b.id)) continue;
+      const shared = nonCenter.filter(c =>
+        c.id !== a.id && c.id !== b.id &&
+        linked(a.id, c.id) && linked(b.id, c.id)
+      );
+      if (shared.length > 0) triangles.push({ a, b, shared });
+    }
+  }
+
+  if (triangles.length > 0) {
+    const ex = triangles[0];
+    patterns.push({
+      icon: '△',
+      title: `${triangles.length} Mutual Clique${triangles.length > 1 ? 's' : ''} Detected`,
+      detail: [
+        `Groups of 3+ players who are all friends with each other.`,
+        `Example: ${ex.a.username || ex.a.name || 'Unknown'}, ${ex.b.username || ex.b.name || 'Unknown'}, and ${formatUsernames(ex.shared, 2)}`,
+        `Cliques often indicate tight friend groups or clan members.`,
+      ]
+    });
+  }
+
+  // ── 10. BANNED / RESTRICTED USERS ───────────────────────────────────────────
+
+  const banned = nodes.filter(n => n.isBanned);
+  if (banned.length > 0) {
+    patterns.push({
+      icon: '-',
+      title: `${banned.length} Restricted User${banned.length > 1 ? 's' : ''}`,
+      detail: [
+        `${formatUsernames(banned, 6)}`,
+        `These accounts may be banned or have active restrictions.`,
+      ]
+    });
+  }
+
+  // ── 11. EXPANSION ACTIVITY ───────────────────────────────────────────────────
+
+  const expanded = nodes.filter(n => n.expanded);
+  if (expanded.length > 0) {
+    patterns.push({
+      icon: '+',
+      title: `${expanded.length} Node${expanded.length > 1 ? 's' : ''} Fully Expanded`,
+      detail: [
+        `${formatUsernames(expanded, 6)}`,
+        `Their full friend networks have been mapped.`,
+      ]
+    });
+  }
+
+  // ── RENDER ───────────────────────────────────────────────────────────────────
+
   const el = document.getElementById('pattern-list');
+  if (!el) return;
+
   if (!patterns.length) {
-    el.innerHTML = '<div class="pat-item" style="color:var(--text3)">No patterns yet. Expand more nodes to reveal connections.</div>';
+    el.innerHTML = `
+      <div class="pat-item" style="color:var(--text3)">
+        No patterns detected yet.<br><br>
+        <strong>Try these actions:</strong>
+        <ul style="margin-top:8px; padding-left:20px;">
+          <li>Enter a username in the search bar</li>
+          <li>Click "Expand" on nodes to map their networks</li>
+          <li>Look for shared groups, online players, and mutual connections</li>
+        </ul>
+      </div>`;
     return;
   }
+
   el.innerHTML = patterns.map(p => `
     <div class="pat-item">
       <div class="pat-item-title">${p.icon} ${p.title}</div>
-      <div class="pat-item-detail">${p.detail}</div>
+      <div class="pat-item-detail">${p.detail.filter(Boolean).map(line => `• ${line}`).join('<br>')}</div>
     </div>`).join('');
 }
 
