@@ -960,6 +960,23 @@ G.sim = d3.forceSimulation()
   .force('collide', d3.forceCollide(d => nodeR(d) + 18).iterations(2)) // Reduced collision radius and iterations (biggest win!)
   .on('tick', onTick);
 
+  // Add a damping force that gradually slows movement
+   G.sim.on('tick', function(e) {
+    if (G.linkSel) G.linkSel
+      .attr('x1', d => d.source.x).attr('y1', d => d.source.y)
+      .attr('x2', d => d.target.x).attr('y2', d => d.target.y);
+    
+    // Apply damping to reduce jitter when simulation settles
+    if (G.sim.alpha() < 0.05 && G.nodes.length > 0) {
+      G.nodes.forEach(n => {
+        n.vx *= 0.98;
+        n.vy *= 0.98;
+      });
+    }
+    
+    if (G.nodeSel) G.nodeSel.attr('transform', d => `translate(${d.x ?? 0},${d.y ?? 0})`);
+  });
+
   window.addEventListener('resize', () => {
     const w2 = wrap.clientWidth, h2 = wrap.clientHeight;
     G.sim.force('center', d3.forceCenter(w2 / 2, h2 / 2).strength(.04));
