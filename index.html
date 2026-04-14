@@ -977,7 +977,7 @@ function nodeR(d) {
   // Scale by follower count using logarithmic scale
   // This makes the size grow slower as followers increase, preventing extreme size differences
   const followers = d.data?.social?.followers || 0;
-  const followerBonus = Math.log10(followers + 1) * 4; // Log scale multiplier
+  const followerBonus = Math.log10(followers + 1) * 5; // Log scale multiplier
   
   return baseSize + followerBonus;
 }
